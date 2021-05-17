@@ -1,0 +1,31 @@
+assemble: [src/sp.s]
+disks:
+- name: senseiplay
+  file: senseiplay800.2mg
+  size: 800KB
+  files:
+  - input: ../PRODOS.2.4.2/PRODOS
+    output: /senseiplay        
+  - input: src/sp.s
+    output: /senseiplay/src
+  - input: ntp/ntpplayer
+    output: /senseiplay
+  - input: ../modsearch/potential/eclipse.ntp
+    output: /senseiplay
+    ftaux: #B30000
+  - input: src/sensei.system
+    output: /senseiplay
+  - input: content/NHFbyNFCv03.ntp
+    output: /senseiplay/ntp
+  - input: content/dotland.ntp
+    output: /senseiplay/ntp
+  - input: content/eshaa.ntp
+    output: /senseiplay/ntp
+  - input: content/exquisite.ntp
+    output: /senseiplay/ntp
+  - input: content/dr4.ntp
+    output: /senseiplay/ntp
+
+
+
+    
