@@ -45,7 +45,9 @@ P8_CLOSE_PCNT     =     1
 *       +-----------------------+
 
 
-*PT_LoadFilenameToPtr 'ntpplayer';ReadBuf;0     ; address in 0
+**** MACROS ****
+
+*PT_LoadFilenameToPtr 'ntpplayer';0     ; address in 0
 * ]1 = pathname
 * ]2 = DP pointer           <- points to destination
 PT_LoadFilenameToPtr MAC
@@ -164,92 +166,83 @@ _PT_PARMTABLE     ds    16                      ; this is a reusable P8 paramete
 
 
 
-_fileToPtr        MAC
-                  clc
-                  xce
-                  rep   #$30
-                  jsr   saveHoles
-                  lda   ]2
-                  sta   storepoint+1
-                  lda   ]2+1
-                  sta   storepoint+2
-                  sec
-                  xce
-                  jsr   $bf00
-                  dfb   $c8
-                  da    openparm
-                  beq   load
-                  bra   error_handler
-load
-                  lda   ref_num
-                  sta   ref_num_r
-                  sta   ref_num_c
-load_loop
-                  sec
-                  xce
-                  jsr   $bf00
-                  dfb   $ca
-                  da    readparm
-                  beq   copy
-                  cmp   #$4c
-                  beq   copy
-                  bra   error_handler
-copy
-                  clc
-                  xce
-                  rep   #$30
-                  ldy   #$0000
-move_loop
-                  ldx   dest_index
-                  lda   ]3,y
-storepoint        stal  $000000,x
-                  cpy   #$0400
-                  beq   reload
-                  iny
-                  iny
-                  inc   dest_index
-                  inc   dest_index
-                  bra   move_loop
-reload
-                  lda   bytes_read
-                  cmp   #$400
-                  bne   close
-                  bra   load_loop
-close
-                  sec
-                  xce
-                  jsr   $bf00
-                  dfb   $cc
-                  da    closeparm
-                  bcs   error_handler
-                  bra   done
-error_handler
-                  sec
-                  xce
-                  ldx   #$f0
-                  stx   $c022
-                  jsr   $fdda
-                  jsr   $fd8e
-halt              bra   halt
-openparm          dfb   3
-                  da    pathname
-                  da    $8000
-ref_num           ds    1
-pathname          str   ]1
-readparm          dfb   4
-ref_num_r         ds    1
-                  da    ]3
-                  dw    $0400
-bytes_read        ds    2
-closeparm         dfb   1
-ref_num_c         ds    1
-dest_index        dw    $0000
-done
-                  clc
-                  xce
-                  rep   #$30
-                  jsr   restoreHoles
+
+
+
+
+
+
+
+
+******************************************
+* ToolCall Macros                        *
+******************************************
+Tool              MAC
+                  LDX   #]1
+                  JSL   $E10000
                   <<<
+_TLStartUp        MAC
+                  Tool  $201
+                  <<<
+_TLShutDown       MAC
+                  Tool  $301
+                  <<<
+_NewHandle        MAC
+                  Tool  $902
+                  <<<
+_MMStartUp        MAC
+                  Tool  $202
+                  <<<
+_GetMasterId      MAC
+                  Tool  $2003
+                  <<<
+_MTStartUp        MAC
+                  Tool  $203
+                  <<<
+
+_TLTextMountVol   MAC
+                  Tool  $1201
+                  <<<
+_UnPackBytes      MAC
+                  Tool  $2703
+                  <<<
+
+LoadLongXY        MAC
+                  LDX   #^]1
+                  LDY   #]1
+                  <<<
+
+PushLongXY        MAC
+                  PHX
+                  PHY
+                  <<<
+
+PushLong          MAC
+                  IF    #=]1
+                  PushWord #^]1
+                  ELSE
+                  PushWord ]1+2
+                  FIN
+                  PushWord ]1
+                  <<<
+
+PushWord          MAC
+                  IF    #=]1
+                  PEA   ]1
+                  ELSE
+                  IF    MX/2
+                  LDA   ]1+1
+                  PHA
+                  FIN
+                  LDA   ]1
+                  PHA
+                  FIN
+                  <<<
+Tool              MAC
+                  LDX   #]1
+                  JSL   $E10000
+                  <<<
+
 
 ****************************************
 * AllocOneBank                         *
@@ -294,8 +287,3 @@ AllocContiguousPageAlign mx %00
                   rts
 
 
-_loadfile_pathptr adrl  0                       ; 24 bit pointer to pathname
-_loadfile_destptr adrl  0                       ; 24 bit pointer to destination buffer start point, expects contiguous, can cross banks
-_loadfile_dp_src  =     90                      ; dp locations for pointers to source data
-_loadfile_dp_dst  =     94                      ; dp locations for pointers to destination area
-LoadFile          lda   #44

@@ -52,25 +52,25 @@
                   jsr   PrepareTools
                   jsr   PrepareNTP
 
-                              ; .... TEST CODE ....
-                lda #$0003 ; bank 3 
-                sta $02 ; dp ptr hi
-                stz $00  ; dp ptr lo 
-                   PT_LoadFilenameToPtr 'ntp/eshaa.ntp';0 
-                   jsr StartMusic
-        FUNHALT
-  mx %00
+                                                ; .... TEST CODE ....
+                  lda   #$0003                  ; bank 3
+                  sta   $02                     ; dp ptr hi
+                  stz   $00                     ; dp ptr lo
+                  PT_LoadFilenameToPtr 'ntp/dr4.ntp';0
+                  jsr   StartMusic
+                  FUNHALT
+                  mx    %00
 
-StartMusic          lda         #$0003
-                    ;xba
-                    tay
-                    ldx         #0
-                    jsr         _NTPprepare
-                    bcc         ok
-                    brk         $ee                      ;@todo?
-ok                  lda         #0
-                    jsr         _NTPplay
-                    rts
+StartMusic        lda   #$0003
+                                                ;xba
+                  tay
+                  ldx   #0
+                  jsr   _NTPprepare
+                  bcc   ok
+                  brk   $ee                     ;@todo?
+ok                lda   #0
+                  jsr   _NTPplay
+                  rts
 
 
 PrepareNTP        mx    %00
@@ -98,11 +98,11 @@ PrepareNTP        mx    %00
 :fo               inc   $c034
                   bra   :fo
 
-                ;  jsr   P8CALL_GET_PREFIX
-                 ; lda   P8BUFF_PREFIXPATH
-                 ; jsr   P8CALL_ONLINE
-                 ; lda   P8BUFF_DRIVES_ONLINE
-                 ; jsr   DirTest
+                                                ;  jsr   P8CALL_GET_PREFIX
+                                                ; lda   P8BUFF_PREFIXPATH
+                                                ; jsr   P8CALL_ONLINE
+                                                ; lda   P8BUFF_DRIVES_ONLINE
+                                                ; jsr   DirTest
                   jsr   P8Quit
 
 ******************************************
@@ -196,7 +196,7 @@ ContDeath         ldx   #$1503
 * Standard ProDOS 8 Quit routine         *
 ******************************************
                   mx    %11
-P8Quit            jsr   P8_MLI_CALL                     ; first actual command, call ProDOS vector
+P8Quit            jsr   P8_MLI_CALL             ; first actual command, call ProDOS vector
                   dfb   $65                     ; with "quit" request ($65)
                   da    QuitParm
                   bcs   Error                   ; what's the point?  ;)
@@ -208,74 +208,6 @@ QuitParm          dfb   4                       ; number of parameters
                   dfb   0                       ; not used
                   da    $0000                   ; not used
 
-******************************************
-* ToolCall Macros                        *
-******************************************
-Tool              MAC
-                  LDX   #]1
-                  JSL   $E10000
-                  <<<
-_TLStartUp        MAC
-                  Tool  $201
-                  <<<
-_TLShutDown       MAC
-                  Tool  $301
-                  <<<
-_NewHandle        MAC
-                  Tool  $902
-                  <<<
-_MMStartUp        MAC
-                  Tool  $202
-                  <<<
-_GetMasterId      MAC
-                  Tool  $2003
-                  <<<
-_MTStartUp        MAC
-                  Tool  $203
-                  <<<
-
-_TLTextMountVol   MAC
-                  Tool  $1201
-                  <<<
-_UnPackBytes      MAC
-                  Tool  $2703
-                  <<<
-
-LoadLongXY        MAC
-                  LDX   #^]1
-                  LDY   #]1
-                  <<<
-
-PushLongXY        MAC
-                  PHX
-                  PHY
-                  <<<
-
-PushLong          MAC
-                  IF    #=]1
-                  PushWord #^]1
-                  ELSE
-                  PushWord ]1+2
-                  FIN
-                  PushWord ]1
-                  <<<
-
-PushWord          MAC
-                  IF    #=]1
-                  PEA   ]1
-                  ELSE
-                  IF    MX/2
-                  LDA   ]1+1
-                  PHA
-                  FIN
-                  LDA   ]1
-                  PHA
-                  FIN
-                  <<<
-Tool              MAC
-                  LDX   #]1
-                  JSL   $E10000
-                  <<<
 
 MasterId          ds    2
 UserId            ds    2
@@ -324,12 +256,12 @@ FUNHALT           MAC
                   sec
                   xce
                   sep   #$30
-:loop                lda $c019
+:loop             lda   $c019
 
-                  bpl :skip
-                  lda #$f6
-                  sta $c022
-:skip                  lda   #$db
+                  bpl   :skip
+                  lda   #$f6
+                  sta   $c022
+:skip             lda   #$db
                   jsr   $fdda
 
                   lda   $c022
@@ -341,8 +273,6 @@ FUNHALT           MAC
                   bne   :delay
                   bra   :loop
                   <<<
-
-
 
 
                   put   p8tools
