@@ -11,6 +11,15 @@
 *  NinjaTrackerPlus (NTP) Engine by Jesse Blue of Ninjaforce                   *
 ********************************************************************************
 
+* $D5	$0008	NTP	NinjaTrackerPlus sequence [Application Specific]
+* from: https://github.com/a2infinitum/apple2-filetypes
+* not at: https://prodos8.com/docs/techref/quick-reference-card/
+
+
+
+VTAB              equ   $FC22                   ; Sets the cursor vertical position (from CV)
+HOME              equ   $FC58                   ; Clears the window and puts the cursor in the upper left
+                                                ;  corner of the window
 
 ****
 *   PrepareTools
@@ -46,17 +55,29 @@
                   org   $2000                   ; start at $2000 (all ProDOS8 system files)
                   typ   $ff
                   mx    %11
+
+                  sep   #$30
+                  lda   #$A0                    ;USE A BLANK SPACE TO
+                  jsr   $C300                   ;TURN ON THE VIDEO FIRMWARE
+                  GOXY  #5;#15
+                  PRINTSTR MouseString
+
+
                   clc
                   xce
                   rep   #$30
+
                   jsr   PrepareTools
                   jsr   PrepareNTP
+                  >>>   PT_GetPrefix            ; returns ptr in A
+                  >>>   PT_PrintProdosStr
+                  >>>   PT_ReadDir
 
                                                 ; .... TEST CODE ....
                   lda   #$0003                  ; bank 3
                   sta   $02                     ; dp ptr hi
                   stz   $00                     ; dp ptr lo
-                  PT_LoadFilenameToPtr 'ntp/dr4.ntp';0
+                  PT_LoadFilenameToPtr 'ntp/engine.ntp';0
                   jsr   StartMusic
                   FUNHALT
                   mx    %00
@@ -279,4 +300,97 @@ FUNHALT           MAC
                   dsk   sensei.system
 
 
+GOXY_mixed        MAC
 
+                  IF    mx/2-1                  ; LONGM
+
+                  lda   #]2+{]1*$100}           ; multiply low byte by 256 and add high byte
+                  sta   $24
+                  php
+                  sep   #$30
+
+                  jsr   VTAB
+
+
+                  plp
+                  brk   #$f0
+
+                  ELSE
+                  ldx   ]1
+                  ldy   ]2
+                  stx   $24
+                  sty   $25
+                  jsr   VTAB
+                  FIN
+                  <<<
+
+GOXY              MAC
+                  ldx   ]1
+                  ldy   ]2
+                  stx   $24
+                  sty   $25
+                  jsr   VTAB
+                  <<<
+
+PRINTSTR          MAC
+                  lda   #]1
+                  ldy   #>]1
+                  jsr   PrintString
+                  <<<
+
+PRINTSTR_mixed    MAC
+                  IF    16_BIT                  ;  mx 00
+                  sep   #$30
+                  lda   #]1
+                  ldy   #>]1
+                  jsr   PrintString
+                  rep   #$30
+
+                  ELSE                          ; mx 11
+                  lda   #]1
+                  ldy   #>]1
+                  jsr   PrintString
+                  FIN
+                  rts
+                  <<<
+
+
+PRINTXY           MAC
+
+                  ldx   ]1
+                  ldy   ]2
+                  stx   $24
+                  sty   $25
+                  jsr   VTAB
+                  lda   #]3
+                  ldy   #>]3
+                  jsr   PrintString
+                  <<<
+
+* PrintString (A=Low Byte,  Y=High Byte)
+PrintString       mx    %11
+                  sta   :loop+1
+                  sty   :loop+2
+
+                  ldy   #0
+:loop             lda   $FFFF,y                 ; dummy bytes
+                  beq   :done
+                  jsr   $FDED                   ;COUT
+                  iny
+                  bra   :loop
+:done             rts
+
+
+BigNum            MAC
+                  lda   #]2+{]1*$100}           ; multiply low byte by 256 and add high byte
+                  <<<
+
+
+
+
+
+MyString          asc   "Welcome",00
+MouseString       asc   $1B,'@ABCDEFGHIJKLMNOPQRSTUVWXYZXYXY[\]^_',$18,00
+
+                  ds    \
+DirList           ds    4096

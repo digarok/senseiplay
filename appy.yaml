@@ -25,7 +25,12 @@ disks:
     output: /senseiplay/ntp
   - input: content/dr4.ntp
     output: /senseiplay/ntp
-
+  - input: content/eff.ntp
+    output: /senseiplay/ntp
+  - input: content/einstein.ntp
+    output: /senseiplay/ntp
+  - input: content/engine.ntp
+    output: /senseiplay/ntp
 
 
     

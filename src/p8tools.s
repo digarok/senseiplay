@@ -3,8 +3,16 @@ P8_OPEN_BUFFER    =     $800                    ; @todo: allocate  ..  buffer fo
 P8_DATA_BUFFER    =     $D00                    ; @todo: allocate  ..  buffer for file read data
 P8_DATA_BUFFER_SZ =     $1000                   ;
 PT_DST_PTR        =     $00                     ; DP location used for copies
-P8_ERR_BUF_IN_USE =     $56                     ; when the specified buffer is marked in-use by Prodos system table
+PT_TMP_PTR        =     $04                     ; Use for internal routines like string handling
+PT_DIR_ENTRY_PTR  =     $08                     ; point to current entry when scanning a directory    
+P8_ERR_BUF_IN_USE =     #$56                     ; when the specified buffer is marked in-use by Prodos system table
+P8_ERR_EOF        =     #$4C                     ; hit End Of File (or directory)
+PT_PREFIX_BUFFER  =     $1D00                   ; 256 byte area
 
+P8_CROUT          =     $FC62
+P8_CROUT2         =     $FD8E
+P8_COUT           =     $FDED
+P8_PRHEX          =     $FDDA
 
 ********************************************************** OPEN ($C8)
 P8_OPEN           =     $C8
@@ -45,7 +53,79 @@ P8_CLOSE_PCNT     =     1
 *       +-----------------------+
 
 
-**** MACROS ****
+********************************************************** GET_PREFIX ($C7)
+P8_GET_PREFIX     =     $C7
+P8_GET_PREFIX_PCNT =    1
+*       +-----------------------+
+*     0 | Number of Parms (1)   |
+*       +-----------------------+-----------------------+
+*    +1 | Pointer to Data Buffer                        |  <- result
+*       +-----------------------+-----------------------+
+
+
+
+********************************************************** SET_MARK ($CE)
+P8_SET_MARK       =     $CE
+P8_SET_MARK_PCNT  =     2
+*       +-----------------------+
+*     0 | Number of Parms (2)   |
+*       +-----------------------+
+*    +1 | Reference Number      |
+*       +-----------------------+-----------------------+-----------------------+
+*    +2 | Mark Position (3-byte ptr inside file)                                |
+*       +-----------------------+-----------------------+-----------------------+
+
+
+
+
+
+
+
+*************************** MACROS **********************************
+
+* A=ptr to str (with prefix length byte)
+* This sets the high bit for each character in the string before printing
+PT_PrintProdosStr MAC
+                  jsr   _PT_PrintProdosStr
+                  <<<
+
+_PT_PrintProdosStr mx   %00
+                  sta   PT_TMP_PTR
+                  sep   #$30
+                  lda   [PT_TMP_PTR]            ; length byte
+                  tax
+                  ldy   #1                      ; pre-increment index past length byte
+:prloop           lda   [PT_TMP_PTR],y          ; SMC
+                  ora   #%1000_0000             ; make printable char
+                  jsr   P8_COUT
+                  iny
+                  dex
+                  bpl   :prloop
+                  rep   #$30
+                  rts
+
+
+* Returns buffer location in A
+PT_GetPrefix      MAC
+                  jsr   _PT_GetPrefix
+                  <<<
+
+_PT_GetPrefix     mx    %00
+                  lda   #PT_PREFIX_BUFFER       ; set result buffer
+                  sta   _PT_PARMTABLE+1
+                  sep   #$30
+                  lda   #P8_GET_PREFIX          ; set up GET_PREFIX call
+                  sta   PT_P8CALL_NUM
+                  lda   #P8_GET_PREFIX_PCNT     ; build GET_PREFIX parm table
+                  sta   _PT_PARMTABLE
+                  jsr   PT_P8CALL               ; returns in emulation 8-bit mode
+                  clc
+                  xce
+                  rep   #$30
+                  lda   #PT_PREFIX_BUFFER
+                  rts
+
+
 
 *PT_LoadFilenameToPtr 'ntpplayer';0     ; address in 0
 * ]1 = pathname
@@ -58,14 +138,14 @@ PT_LoadFilenameToPtr MAC
                   sta   PT_DST_PTR+2
                   lda   #_pathname
 
-                  jsr   PT_LoadFile
+                  jsr   _PT_LoadFile
                   bra   _done
 _pathname         str   ]1
 _done
                   <<<
 
 * a=#pathname
-PT_LoadFile       mx    %00
+_PT_LoadFile      mx    %00
                   sta   _PT_PARMTABLE+1
                                                 ; ------------------- OPEN ---
                   sep   #$30
@@ -95,7 +175,7 @@ PT_LoadFile       mx    %00
 
 :read_loop        jsr   PT_P8CALL               ; READ file
                   lda   _PT_PARMTABLE+6         ; to check returned number of bytes to see if EOF
-                  beq   :eof_read_zero_bytes    ; this will also catch a buffer aligned file on final read
+                  beq   :eof_read_zero_bytes    ; this will also catch a buffer aligned file on final read, I think...
                   sta   :eof_check+1
 
 :copy_to_dest                                   ; copy buffer to real destination
@@ -116,11 +196,8 @@ PT_LoadFile       mx    %00
                   inc   PT_DST_PTR+2            ; bank++
                   bra   :read_loop
 
-:eof_returned_bytes
-
-:eof_read_zero_bytes
-
-
+:eof_returned_bytes                             ;\___ these should both be okay
+:eof_read_zero_bytes                            ;/
                                                 ; ------------------- CLOSE --
                   sep   #$30
                   lda   #P8_CLOSE_PCNT
@@ -132,6 +209,7 @@ PT_LoadFile       mx    %00
                   rts
 
 
+**** PT PRODOS MLI "DISPATCHER" ****
 PT_P8CALL         sec                           ; normally called in 16-bit mode!
                   xce
                   jsr   P8_MLI_CALL
@@ -144,7 +222,7 @@ PT_P8CALL_NUM     =     *-1                     ; SMC
                   rep   #$30                    ; return in 16 bit mode!
                   rts
                   mx    %11
-:error
+:error            cmp #$4C
                   brl   PT_P8_ERROR
 
 
@@ -154,23 +232,19 @@ PT_P8_ERROR
                   xce
                   ldx   #$f0
                   stx   $c022
-                  jsr   $fdda
-                  jsr   $fd8e
+                  jsr   P8_PRHEX
+                  jsr   P8_CROUT
                   wai                           ; HALT
 
-** Reusable parm table
+** reusable parm table
 _PT_REFNUM        dw    0                       ; reusable reference number for a single open file (only uses a byte but padded for 16-bit code)
 _PT_PATHNAME_PTR  da    0                       ; reusable pointer to pathname of current file being worked with
 _PT_PARMTABLE     ds    16                      ; this is a reusable P8 parameter table to be filled out dynamically
 
-
-
-
-
-
-
-
-
+** used for scanning directory/volume entries
+_PT_DIR_ENTRY_LENGTH db 0                       ; length in bytes of each entry in the directory
+_PT_DIR_ENTRIES_PER_BLOCK db 0                  ; number of entries stored in each block of the directory file
+_PT_DIR_ENTRIES_REMAINING db 0                  ; used to track remaining entries when scanning dir blocks
 
 
 
@@ -287,3 +361,214 @@ AllocContiguousPageAlign mx %00
                   rts
 
 
+
+
+
+
+
+
+* A=ptr to prefixpath
+PT_ReadDir        MAC
+                  jsr   _PT_ReadDir
+                  <<<
+
+
+_PT_ReadDir       mx    %00 
+
+*           sta   _PT_PARMTABLE+1        ; ptr to prefix could be passed in....
+
+                                                ; ------------------- OPEN ---
+                  sep $30
+                  sec
+                  xce
+                  jsr P8_CROUT
+                  clc
+                  xce
+                  sep $30
+                  lda   #P8_OPEN                ; set up OPEN call
+                  sta   PT_P8CALL_NUM
+                  lda   #P8_OPEN_PCNT           ; build OPEN parm table
+                  sta   _PT_PARMTABLE
+                  rep   #$30
+                  lda   #P8_OPEN_BUFFER
+                  sta   _PT_PARMTABLE+3         ; done setting up OPEN
+                  jsr   PT_P8CALL               ; OPEN file
+                  sep   #$30
+                  lda   _PT_PARMTABLE+5         ; get REFNUM
+                  sta   _PT_REFNUM              ; store REFNUM for OPEN file
+                                                ; @todo: dedupe above open code, identical to file open?
+
+_PT_SetMarkFirstDirectoryBlock mx %11           ; YO I PROLLY DON'T NEED TO DO THIS SINCE I DON'T COME BACK HERE... ?
+                  lda   #$00
+                  sta   _PT_PARMTABLE+2         ; zero position for MLI_SET_MARK
+                  sta   _PT_PARMTABLE+3
+                  sta   _PT_PARMTABLE+4
+                  lda   _PT_REFNUM
+                  sta   _PT_PARMTABLE+1
+                  lda   #P8_SET_MARK            ; set up SET_MARK call
+                  sta   PT_P8CALL_NUM
+                  lda   #P8_SET_MARK_PCNT
+                  sta   _PT_PARMTABLE
+                  rep   #$30
+                  jsr   PT_P8CALL               ; SET_MARK in directory blocks
+                  sep   #$30
+
+_PT_ReadNextDirectoryBlock
+                                                ;lda   _PT_REFNUM
+                                                ;sta   _PT_PARMTABLE+1              ; refnum is already set
+
+                  lda   #<P8_DATA_BUFFER
+                  sta   _PT_PARMTABLE+2
+                  lda   #>P8_DATA_BUFFER        ; ??? this was originally +1 ?
+                  sta   _PT_PARMTABLE+3         ; store in (aDirData)
+                  lda   #$00
+                  sta   _PT_PARMTABLE+4
+                  lda   #$02                    ; read $0200 bytes (= 2 sectors, = 1 ProDOS block)
+                  sta   _PT_PARMTABLE+5
+
+                  lda   #P8_READ                ; set up READ call
+                  sta   PT_P8CALL_NUM
+                  lda   #P8_READ_PCNT
+                  sta   _PT_PARMTABLE
+                  rep   #$30
+                  jsr   PT_P8CALL               ; READ in directory blocks
+
+** When you read a block you first must check the length and entries per block 
+** and store that to loop through the entries
+                  sep #$30
+                  lda   P8_DATA_BUFFER+$23
+                  sta   _PT_DIR_ENTRY_LENGTH
+                  lda   P8_DATA_BUFFER+$24
+                  sta   _PT_DIR_ENTRIES_PER_BLOCK
+
+                  lda   #<P8_DATA_BUFFER+4
+                  sta   PT_DIR_ENTRY_PTR
+                  lda   #>P8_DATA_BUFFER+4
+                  sta   PT_DIR_ENTRY_PTR+1
+                  lda   _PT_DIR_ENTRIES_PER_BLOCK
+                  sta   _PT_DIR_ENTRIES_REMAINING  ; now we're all set to scan!
+                  
+* When you read in a directory or volume block you can skip the first
+* entry because it's the header, referring to the directory
+
+
+_PT_NextEntry               dec   _PT_DIR_ENTRIES_REMAINING
+                  beq   _PT_ReadNextDirectoryBlock
+                  lda   PT_DIR_ENTRY_PTR
+                  clc
+                  adc   _PT_DIR_ENTRY_LENGTH
+                  sta   PT_DIR_ENTRY_PTR
+                  lda   PT_DIR_ENTRY_PTR+1
+                  adc   #$00
+                  sta   PT_DIR_ENTRY_PTR+1
+                  ldy   #$00
+                  lda   (PT_DIR_ENTRY_PTR),y
+                  and   #$F0
+                  cmp   #$00
+                  beq   _PT_NextEntry           ; skip inactive entry
+                  ;cmp   #$D0
+                  ;beq   _PT_NextEntry           ; skip subdirectory
+                  ldy   #$10
+                  lda   (PT_DIR_ENTRY_PTR),y
+
+                  jsr DisplayFile
+                  bra _PT_NextEntry
+
+                  BRK   $ff
+DisplayFile
+       lda   #">"
+                  jsr   $FDED
+                  ldy   #$0
+                  lda   (PT_DIR_ENTRY_PTR),y               ; get storage type / filename length combination byte
+                  and   #$0F                    ; trim storage type
+                  sta   (PT_DIR_ENTRY_PTR),y               ; store actual length so we can use this as a length-prefixed string
+
+                  iny                           ; y=1
+                  tax                           ; x=len
+
+:prname           lda   (PT_DIR_ENTRY_PTR),y
+                  ora   #$80
+                  jsr   $FDED
+                  iny
+                  dex
+                  bne   :prname
+                  jsr P8_CROUT
+                  rts
+                  IF    0
+
+*0d00.0d60
+
+*00/0D00:00 00 03 00 FA 53 45 4E-....zSEN
+*00/0D08:53 45 49 50 4C 41 59 00-SEIPLAY.
+*00/0D10:00 00 00 00 00 00 B3 2A-......3*
+*00/0D18:12 16 E0 FF B3 2A 12 16-..`.3*..
+*00/0D20:05 00 C3 27 0D 06 00 06-..C'....
+*                 |     `---------------------  entriesPerBlock
+*                 `------------------------ entry length
+*00/0D28:00 40 06 26 50 52 4F 44-.@.&PROD
+*00/0D30:4F 53 00 00 00 00 00 00-OS......
+*00/0D38:00 00 00 FF 07 00 22 00-......".
+*00/0D40:E8 42 00 00 00 00 00 00-hB......
+*00/0D48:80 21 00 00 00 00 00 00-.!......
+*00/0D50:02 00 D3 53 52 43 00 00-..SSRC..
+*00/0D58:00 00 00 00 00 00 00 00-........
+*00/0D60:00-.
+                  FIN
+                  MAC
+
+
+
+                  if    0
+                                                ; bcc   firstTimeSetup          ; check error manually
+                                                ;cmp   #$4C                    ; MLI error was EOF?
+                                                ; beq   _PT_ReadFirstDirectoryBlock ;yes, startoveratthebeginningofdirectory
+                                                ; bne   CloseAll                ; no, real error
+firstTimeSetup
+                  lda   entryLength
+                  bne   skipFirstTime
+                  lda   aDirData+$23
+                  sta   entryLength
+                  lda   aDirData+$24
+                  sta   entriesPerBlock
+skipFirstTime
+                  lda   #<aDirData+4
+                  sta   entry
+                  lda   #>aDirData+4
+                  sta   entry+1
+                  lda   entriesPerBlock
+                  sta   entriesRemaining
+GoToNextEntry
+                  dec   entriesRemaining
+                  beq   _PT_ReadNextDirectoryBlock
+                  lda   entry
+                  clc
+                  adc   entryLength
+                  sta   entry
+                  lda   entry+1
+                  adc   #$00
+                  sta   entry+1
+                  ldy   #$00
+                  lda   (entry),                y
+                  and   #$F0
+                  cmp   #$00
+                  beq   GoToNextEntry           ; skip inactive entry
+                  cmp   #$D0
+                  beq   GoToNextEntry           ; skip subdirectory
+                  ldy   #$10
+                  lda   (entry),y
+                                                ;cmp   #$06
+                                                ;bne   GoToNextEntry           ; BIN files only
+                                                ;ldy   #$15
+                                                ;lda   (entry),y
+                                                ;bne   GoToNextEntry           ; wrong size (must be exactly $4000)
+                                                ;ldy   #$17
+                                                ;lda   (entry),y
+                                                ;bne   GoToNextEntry           ; wrong size
+                                                ;dey
+                                                ;lda   (entry),y
+                                                ;cmp   #$40
+                                                ;bne   GoToNextEntry           ; wrong size
+                  jsr   DisplayFile
+
+                  bra   GoToNextEntry           ; always branches
+                  FIN
