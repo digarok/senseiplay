@@ -71,7 +71,10 @@ HOME              equ   $FC58                   ; Clears the window and puts the
                   jsr   PrepareNTP
                   >>>   PT_GetPrefix            ; returns ptr in A
                   >>>   PT_PrintProdosStr
-                  >>>   PT_ReadDir
+                  >>>   PT_SetDirListPtr,DirList
+                  >>>   PT_ReadDir  ; returns count in A
+                  sta DirListCount
+
 
                                                 ; .... TEST CODE ....
                   lda   #$0003                  ; bank 3
@@ -387,10 +390,11 @@ BigNum            MAC
 
 
 
-
-
 MyString          asc   "Welcome",00
 MouseString       asc   $1B,'@ABCDEFGHIJKLMNOPQRSTUVWXYZXYXY[\]^_',$18,00
 
+DirListCount dw 0
                   ds    \
-DirList           ds    4096
+DirListMaxEntries =     256
+DirListEntrySize  =     20                     ; 16 name + 1 type + 3 len
+DirList           ds    #DirListEntrySize*DirListMaxEntries

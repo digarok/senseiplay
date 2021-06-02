@@ -4,15 +4,19 @@ P8_DATA_BUFFER    =     $D00                    ; @todo: allocate  ..  buffer fo
 P8_DATA_BUFFER_SZ =     $1000                   ;
 PT_DST_PTR        =     $00                     ; DP location used for copies
 PT_TMP_PTR        =     $04                     ; Use for internal routines like string handling
-PT_DIR_ENTRY_PTR  =     $08                     ; point to current entry when scanning a directory    
-P8_ERR_BUF_IN_USE =     #$56                     ; when the specified buffer is marked in-use by Prodos system table
-P8_ERR_EOF        =     #$4C                     ; hit End Of File (or directory)
+PT_DIR_ENTRY_PTR  =     $08                     ; point to current entry when scanning a directory
+P8_ERR_BUF_IN_USE =     #$56                    ; when the specified buffer is marked in-use by Prodos system table
+P8_ERR_EOF        =     #$4C                    ; hit End Of File (or directory)
 PT_PREFIX_BUFFER  =     $1D00                   ; 256 byte area
 
 P8_CROUT          =     $FC62
 P8_CROUT2         =     $FD8E
 P8_COUT           =     $FDED
 P8_PRHEX          =     $FDDA
+
+P8_DIR_ENT_OFFSET_TYPE = $10
+P8_DIR_ENT_OFFSET_LEN = $15                     ; $15-17
+
 
 ********************************************************** OPEN ($C8)
 P8_OPEN           =     $C8
@@ -217,13 +221,16 @@ PT_P8CALL         sec                           ; normally called in 16-bit mode
 PT_P8CALL_NUM     =     *-1                     ; SMC
                   da    _PT_PARMTABLE
                   bne   :error
-                  clc
+:return           clc
                   xce
                   rep   #$30                    ; return in 16 bit mode!
                   rts
                   mx    %11
-:error            cmp #$4C
-                  brl   PT_P8_ERROR
+:error            cmp   #P8_ERR_EOF
+                  bne   :fatal
+                  ldx   _PT_EXPECT_EOF
+                  bne   :return                 ; EOF is ok
+:fatal            brl   PT_P8_ERROR
 
 
 ** Really simple error code output.  I should probably make a real debug error at some point :P
@@ -233,7 +240,7 @@ PT_P8_ERROR
                   ldx   #$f0
                   stx   $c022
                   jsr   P8_PRHEX
-                  jsr   P8_CROUT
+                  jsr   P8_CROUT2
                   wai                           ; HALT
 
 ** reusable parm table
@@ -246,6 +253,7 @@ _PT_DIR_ENTRY_LENGTH db 0                       ; length in bytes of each entry 
 _PT_DIR_ENTRIES_PER_BLOCK db 0                  ; number of entries stored in each block of the directory file
 _PT_DIR_ENTRIES_REMAINING db 0                  ; used to track remaining entries when scanning dir blocks
 
+_PT_EXPECT_EOF    db    0                       ;
 
 
 ******************************************
@@ -365,6 +373,12 @@ AllocContiguousPageAlign mx %00
 
 
 
+PT_SetDirListPtr  MAC
+                  lda   #]1
+                  sta   PT_DST_PTR
+                  lda   #^]1
+                  sta   PT_DST_PTR+2
+                  <<<
 
 
 * A=ptr to prefixpath
@@ -372,19 +386,20 @@ PT_ReadDir        MAC
                   jsr   _PT_ReadDir
                   <<<
 
-
-_PT_ReadDir       mx    %00 
+_PT_ReadDirCount  dw    0
+_PT_ReadDir       mx    %00
 
 *           sta   _PT_PARMTABLE+1        ; ptr to prefix could be passed in....
 
                                                 ; ------------------- OPEN ---
-                  sep $30
-                  sec
+:init             clc
                   xce
-                  jsr P8_CROUT
-                  clc
-                  xce
-                  sep $30
+                  rep   $30
+                  stz   _PT_ReadDirCount
+                  sep   $30
+                  lda   #1
+                  sta   _PT_EXPECT_EOF
+
                   lda   #P8_OPEN                ; set up OPEN call
                   sta   PT_P8CALL_NUM
                   lda   #P8_OPEN_PCNT           ; build OPEN parm table
@@ -432,10 +447,25 @@ _PT_ReadNextDirectoryBlock
                   sta   _PT_PARMTABLE
                   rep   #$30
                   jsr   PT_P8CALL               ; READ in directory blocks
+                  and   #$00ff
+                  cmp   #P8_ERR_EOF
+                  bne   :continue
 
-** When you read a block you first must check the length and entries per block 
+                  sep   #$30
+                  lda   #P8_CLOSE_PCNT
+                  sta   _PT_PARMTABLE
+                  lda   #P8_CLOSE               ; set up CLOSE call
+                  sta   PT_P8CALL_NUM
+                  rep   #$30
+                  jsr   PT_P8CALL
+                  lda   _PT_ReadDirCount        ; return directory entry count
+                  rts
+
+
+
+** When you read a block you first must check the length and entries per block
 ** and store that to loop through the entries
-                  sep #$30
+:continue         sep   #$30
                   lda   P8_DATA_BUFFER+$23
                   sta   _PT_DIR_ENTRY_LENGTH
                   lda   P8_DATA_BUFFER+$24
@@ -446,13 +476,13 @@ _PT_ReadNextDirectoryBlock
                   lda   #>P8_DATA_BUFFER+4
                   sta   PT_DIR_ENTRY_PTR+1
                   lda   _PT_DIR_ENTRIES_PER_BLOCK
-                  sta   _PT_DIR_ENTRIES_REMAINING  ; now we're all set to scan!
-                  
+                  sta   _PT_DIR_ENTRIES_REMAINING ; now we're all set to scan!
+
 * When you read in a directory or volume block you can skip the first
 * entry because it's the header, referring to the directory
 
 
-_PT_NextEntry               dec   _PT_DIR_ENTRIES_REMAINING
+_PT_NextEntry     dec   _PT_DIR_ENTRIES_REMAINING
                   beq   _PT_ReadNextDirectoryBlock
                   lda   PT_DIR_ENTRY_PTR
                   clc
@@ -460,28 +490,40 @@ _PT_NextEntry               dec   _PT_DIR_ENTRIES_REMAINING
                   sta   PT_DIR_ENTRY_PTR
                   lda   PT_DIR_ENTRY_PTR+1
                   adc   #$00
-                  sta   PT_DIR_ENTRY_PTR+1
+                  sta   PT_DIR_ENTRY_PTR+1      ; we're now pointing at a dir entry
+
                   ldy   #$00
                   lda   (PT_DIR_ENTRY_PTR),y
                   and   #$F0
-                  cmp   #$00
-                  beq   _PT_NextEntry           ; skip inactive entry
-                  ;cmp   #$D0
-                  ;beq   _PT_NextEntry           ; skip subdirectory
-                  ldy   #$10
-                  lda   (PT_DIR_ENTRY_PTR),y
+                  cmp   #$00                    ; skip inactive entries
+                  beq   _PT_NextEntry
+                  jsr   CloneEntryToPTDirList
 
-                  jsr DisplayFile
-                  bra _PT_NextEntry
 
-                  BRK   $ff
+***********************************;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  prolly trash and debug crap
+*                  ldy   #$00
+*                  lda   (PT_DIR_ENTRY_PTR),y
+*                  and   #$F0
+*                  cmp   #$00
+*                  beq   _PT_NextEntry           ; skip inactive entry
+                                                ;cmp   #$D0
+                                                ;beq   _PT_NextEntry           ; skip subdirectory
+*                  ldy   #$10
+*                  lda   (PT_DIR_ENTRY_PTR),y
+
+                  jsr   DisplayFile
+***********************************;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                  bra   _PT_NextEntry
+
+
+
 DisplayFile
-       lda   #">"
+                  lda   #">"
                   jsr   $FDED
                   ldy   #$0
-                  lda   (PT_DIR_ENTRY_PTR),y               ; get storage type / filename length combination byte
+                  lda   (PT_DIR_ENTRY_PTR),y    ; get storage type / filename length combination byte
                   and   #$0F                    ; trim storage type
-                  sta   (PT_DIR_ENTRY_PTR),y               ; store actual length so we can use this as a length-prefixed string
+                  sta   (PT_DIR_ENTRY_PTR),y    ; store actual length so we can use this as a length-prefixed string
 
                   iny                           ; y=1
                   tax                           ; x=len
@@ -492,8 +534,61 @@ DisplayFile
                   iny
                   dex
                   bne   :prname
-                  jsr P8_CROUT
+                  jsr   P8_CROUT2
                   rts
+
+
+
+CloneEntryToPTDirList mx %11
+
+:copyNameLen      ldy   #$0
+                  lda   (PT_DIR_ENTRY_PTR),y    ; get storage type / filename length combination byte
+                  and   #$0F                    ; trim storage type
+                  sta   [PT_DST_PTR],y          ; store actual length so we can use this as a length-prefixed string
+:copyNameAndType  iny
+                  cpy   #$11                    ; copy filename + additional byte for filetype at $10
+                  beq   :copyLen
+                  lda   (PT_DIR_ENTRY_PTR),y
+                  sta   [PT_DST_PTR],y
+                  bra   :copyNameAndType
+:copyLen          ldy   #$15                    ;$15
+                  lda   (PT_DIR_ENTRY_PTR),y
+                  pha
+                  iny                           ; $16
+                  lda   (PT_DIR_ENTRY_PTR),y
+                  pha
+                  iny                           ; $17
+                  lda   (PT_DIR_ENTRY_PTR),y
+                  ldy   #$13
+                  sta   [PT_DST_PTR],y
+                  dey
+                  pla
+                  sta   [PT_DST_PTR],y
+                  dey
+                  pla
+                  sta   [PT_DST_PTR],y
+
+
+:advanceDstPtr    lda   PT_DST_PTR
+                  clc
+                  adc   #DirListEntrySize       ; @todo this is defined outside of this file, redefine locally.
+                  sta   PT_DST_PTR              ; doesn't cross banks (16bit) so your buffer shouldn't either
+
+                  inc   _PT_ReadDirCount
+                  inc   $c034
+                  rts
+
+
+
+
+
+
+
+
+
+
+
+
                   IF    0
 
 *0d00.0d60
@@ -515,7 +610,6 @@ DisplayFile
 *00/0D60:00-.
                   FIN
                   MAC
-
 
 
                   if    0
@@ -572,3 +666,4 @@ GoToNextEntry
 
                   bra   GoToNextEntry           ; always branches
                   FIN
+
