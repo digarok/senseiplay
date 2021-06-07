@@ -511,7 +511,9 @@ _PT_NextEntry     dec   _PT_DIR_ENTRIES_REMAINING
 *                  ldy   #$10
 *                  lda   (PT_DIR_ENTRY_PTR),y
 
-                  jsr   DisplayFile
+                  if DEBUG
+                  jsr   DisplayFile  
+                  fin
 ***********************************;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                   bra   _PT_NextEntry
 

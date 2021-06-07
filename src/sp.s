@@ -20,6 +20,9 @@
 VTAB              equ   $FC22                   ; Sets the cursor vertical position (from CV)
 HOME              equ   $FC58                   ; Clears the window and puts the cursor in the upper left
                                                 ;  corner of the window
+COUT              equ   $FDED
+KEY               equ   $C000
+STROBE            equ   $C010
 
 ****
 *   PrepareTools
@@ -61,19 +64,132 @@ HOME              equ   $FC58                   ; Clears the window and puts the
                   jsr   $C300                   ;TURN ON THE VIDEO FIRMWARE
                   GOXY  #5;#15
                   PRINTSTR MouseString
-
+                  jsr   DrawMenuBackground
 
                   clc
                   xce
                   rep   #$30
 
+
                   jsr   PrepareTools
                   jsr   PrepareNTP
                   >>>   PT_GetPrefix            ; returns ptr in A
-                  >>>   PT_PrintProdosStr
+                 ; >>>   PT_PrintProdosStr
                   >>>   PT_SetDirListPtr,DirList
-                  >>>   PT_ReadDir  ; returns count in A
-                  sta DirListCount
+                  >>>   PT_ReadDir              ; returns count in A
+                  sta   DirListCount
+                  brl   MenuLoop
+
+SelectorRun       mx    %00
+:setup            SL_SETWINDOWPOS 25;5
+                  SL_SETWINDOWSIZE 22;8
+                  SL_SETRENDERFUNCTION DirectoryRenderItem
+                  lda   DirListCount
+                  sta   SL_itemscount
+                  rts
+
+* assume cursor xy is set for string printing
+* a = item index   -  uses 0 and 2 on dp
+
+DirectoryRenderItem mx  %00
+                  ldx   #$80
+                  stx   2                       ; don't change chars
+                  stz   _sl_char_count          ; zero char counter
+                  cmp   SL_itemscount           ; see if item exists
+                  bcc   :exists
+                  bra   :pad_out                ; otherwise just pad out the line
+
+
+:exists           tax                           ; get item index
+
+                  cpx   SL_selected
+                  bne   :not_selected
+                  stz   2                       ; turn on char inverter
+:not_selected
+                  lda   #DirList                ; start w pointer at beginning of list
+                  cpx   #0
+                  beq   :continue               ; no need to add anything
+
+                  clc
+:calc_item_start  adc   #DirListEntrySize
+                  dex
+                  bne   :calc_item_start
+:continue         sta   0                       ; address of string at zero
+                  sep   #$30
+
+                  ldy   #$10
+                  lda   (0),y                   ; type
+
+:t0               cmp   #$0F                    ; dir?
+                  bne   :t1
+                  PRINTSTR IcoDirString
+                  bra   :continue2
+:t1
+                  PRINTSTR IcoNoString
+:continue2
+                  lda   (0)                     ; get len byte
+                  tax                           ;  .. counter
+                  ldy   #1                      ; start printing at byte 1
+:pr_loop          lda   (0),y
+
+                  and   #%01111111
+                  sec                           ;\___  char inverter
+                  sbc   2                       ;/
+                  jsr   COUT
+                  inc   _sl_char_count
+                  iny
+                  dex
+                  bne   :pr_loop
+
+:pad_out          sep   $30                     ; leave this, could be coming from above 16-bit area
+                  lda   SL_windowsize_x
+
+                  sec
+                  sbc   _sl_char_count
+                  tax
+
+
+:pad_space        lda   #" "
+
+                  jsr   COUT
+                  dex
+                  bne   :pad_space
+
+                  rep   #$30
+                  rts
+_sl_char_count    dw    0                       ; used for width checking strings
+
+******************************************************************  <<<<<<<<<<<<<<
+MenuLoop
+                  jsr   SelectorRun
+                                                ;               jsr   SL_DemoList1Run
+
+                                                ;           lda #5
+                                                ;           jsr SL_DemoList1RenderItem
+                  jsr   SL_CalculateOffset
+                  jsr   SL_DrawWindow
+                  sep   #$30
+
+                  lda   KEY
+                  bpl   :no_key
+                  sta   STROBE
+                  lda   SL_selected
+                  sta   $c034
+                  lda   KEY
+                  cmp   #'w'
+                  bne   :not_up
+:up               rep   #$30
+                  jsr   SL_DecSelected
+                  bra   MenuLoop
+:not_up           mx    %11
+                  cmp   #'s'
+                  bne   :not_down
+:down             rep   #$30
+                  jsr   SL_IncSelected
+:not_down
+:no_key           rep   #$30
+                  bra   MenuLoop
+******************************************************************  <<<<<<<<<<<<<<
 
 
                                                 ; .... TEST CODE ....
@@ -300,6 +416,7 @@ FUNHALT           MAC
 
 
                   put   p8tools
+                  put   scrollist
                   dsk   sensei.system
 
 
@@ -387,14 +504,76 @@ PrintString       mx    %11
 BigNum            MAC
                   lda   #]2+{]1*$100}           ; multiply low byte by 256 and add high byte
                   <<<
+* lda #MainMenuStrs
+* ldy #>MainMenuStrs
+* ldx #05 ; horiz pos
+PrintStringsX     stx   _printstringsx_horiz
+
+                  sta   $0
+                  sty   $1
+:loop             lda   _printstringsx_horiz
+                  sta   $24
+                  lda   $0                      ; slower, but allows API reuse
+                  ldy   $1
+                  jsr   PrintString             ; y is last val
+                  iny
+                  lda   ($0),y
+                  beq   :done
+                  tya                           ; not done so add strlen to source ptr
+                  clc
+                  adc   $0
+                  sta   $0
+                  bcc   :nocarry
+                  inc   $1
+:nocarry          bra   :loop
 
 
+:done             rts
+
+_printstringsx_horiz db 00
+
+DrawMenuBackground jsr  HOME
+                  lda   #TitleStrs
+                  ldy   #>TitleStrs
+                  ldx   #00                     ; horiz pos
+                  jsr   PrintStringsX
+                  rts
 
 MyString          asc   "Welcome",00
 MouseString       asc   $1B,'@ABCDEFGHIJKLMNOPQRSTUVWXYZXYXY[\]^_',$18,00
+IcoDirString      asc   $1B,'XY',$18," ",$00
+IcoNoString       asc   "   ",$00
+DirListCount      dw    0
 
-DirListCount dw 0
+TitleStrs
+                  asc   " _____________________________________________________________________________",$8D,00
+                  asc   $1B,'ZV_@ZVWVWVWV_',"SenseiPlay",'ZVWVWVWVWVWVWVWVWVWVWVWVWVWVWVWV_'," // Infinitum ",'ZWVWVWVW_',$18,,$8D,00
+                  asc   $1B,'ZLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL_',$18,$8D,00
+                  asc   $1B,'Z',"                          Choose a track:                                    ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                       ____________________________                          ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                       ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLL',"                          ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
+                  asc   $1B,'Z',"    _____                                _     ____     __                   ",'_',$18,$8D,00
+                  asc   $1B,'Z',"   / ___/  ___    ____    _____  ___    (_)   / __ \   / /  ____ _   __  __  ",'_',$18,$8D,00
+                  asc   $1B,'Z',"   \__ \  / _ \  / __ \  / ___/ / _ \  / /   / /_/ /  / /  / __ `/  / / / /  ",'_',$18,$8D,00
+                  asc   $1B,'Z',"  ___/ / /  __/ / / / / (__  ) /  __/ / /   / ____/  / /  / /_/ /  / /_/ /   ",'_',$18,$8D,00
+                  asc   $1B,'Z'," /____/  \___/ /_/ /_/ /____/  \___/ /_/   /_/      /_/   \__,_/   \__, /    ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                                                                  /____/     ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
+ asc   $1B," ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',$18," ",00
+                  hex   00,00
+
+
                   ds    \
 DirListMaxEntries =     256
-DirListEntrySize  =     20                     ; 16 name + 1 type + 3 len
+DirListEntrySize  =     20                      ; 16 name + 1 type + 3 len
 DirList           ds    #DirListEntrySize*DirListMaxEntries
