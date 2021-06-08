@@ -64,6 +64,7 @@ STROBE            equ   $C010
                   jsr   $C300                   ;TURN ON THE VIDEO FIRMWARE
                   GOXY  #5;#15
                   PRINTSTR MouseString
+
                   jsr   DrawMenuBackground
 
                   clc
@@ -73,14 +74,47 @@ STROBE            equ   $C010
 
                   jsr   PrepareTools
                   jsr   PrepareNTP
-                  >>>   PT_GetPrefix            ; returns ptr in A
-                 ; >>>   PT_PrintProdosStr
-                  >>>   PT_SetDirListPtr,DirList
-                  >>>   PT_ReadDir              ; returns count in A
-                  sta   DirListCount
+                  >>>   PT_GetPrefix            ; returns ptr in A ...
+                                                ; >>>   PT_PrintProdosStr ; "/SENSEIPLAY/" is where we start
+
+                  jsr   MenuRefreshDirList
+                                                ;  >>>   PT_SetDirListPtr,DirList ; tell PT where we want our directory list
+                                                ;  >>>   PT_ReadDir              ; returns count in A
+                                                ;  sta   DirListCount
                   brl   MenuLoop
 
-SelectorRun       mx    %00
+MenuRefreshDirList mx   %00
+                  stz   SL_selected             ; always zero
+                  >>>   PT_SetDirListPtr,DirList ; tell PT where we want our directory list
+                  >>>   PT_ReadDir              ; returns count in A
+                  sta   DirListCount
+                  rts
+
+
+PrefixSlashStr    db    1,#'/'
+MenuHandlePrefixChange mx %11
+                  ldy   #1
+                  lda   (0),y                   ; get first char
+                  cmp   #'.'                     ; is it "parent"?
+                  bne   :normal_dir
+:parent_dir       >>>   PT_RemovePrefix
+                  bra   :read_dir
+:normal_dir       >>>   PT_AppendPrefix,0
+                  >>>   PT_AppendPrefix,#PrefixSlashStr
+:read_dir         >>>   PT_SetPrefix
+                  jsr   MenuRefreshDirList
+                  brl   MenuLoop
+                  sep   $30
+                  GOXY  #5;#22
+                  clc
+                  xce
+                  rep   $30
+                  lda   #PT_PREFIX_BUFFER
+                  >>>   PT_PrintProdosStr
+
+
+
+SelectorInit      mx    %00
 :setup            SL_SETWINDOWPOS 25;5
                   SL_SETWINDOWSIZE 22;8
                   SL_SETRENDERFUNCTION DirectoryRenderItem
@@ -106,15 +140,7 @@ DirectoryRenderItem mx  %00
                   bne   :not_selected
                   stz   2                       ; turn on char inverter
 :not_selected
-                  lda   #DirList                ; start w pointer at beginning of list
-                  cpx   #0
-                  beq   :continue               ; no need to add anything
-
-                  clc
-:calc_item_start  adc   #DirListEntrySize
-                  dex
-                  bne   :calc_item_start
-:continue         sta   0                       ; address of string at zero
+                  jsr   SetPtr0toDirEntry       ; this calculates the pointer to our entry and stores it at $0
                   sep   #$30
 
                   ldy   #$10
@@ -122,7 +148,14 @@ DirectoryRenderItem mx  %00
 
 :t0               cmp   #$0F                    ; dir?
                   bne   :t1
-                  PRINTSTR IcoDirString
+
+                  ldy   #1
+                  lda   (0),y                   ; get first char
+                  cmp   #'.'                     ; is it "parent"?
+                  bne   :normal_dir
+:parent_dir       PRINTSTR IcoParentString
+                  bra   :continue2
+:normal_dir       PRINTSTR IcoDirString
                   bra   :continue2
 :t1
                   PRINTSTR IcoNoString
@@ -160,37 +193,115 @@ DirectoryRenderItem mx  %00
 _sl_char_count    dw    0                       ; used for width checking strings
 
 ******************************************************************  <<<<<<<<<<<<<<
-MenuLoop
-                  jsr   SelectorRun
+MenuLoop          clc
+                  xce
+                  rep   #$30
+                  jsr   SelectorInit
                                                 ;               jsr   SL_DemoList1Run
-
-                                                ;           lda #5
-                                                ;           jsr SL_DemoList1RenderItem
                   jsr   SL_CalculateOffset
                   jsr   SL_DrawWindow
                   sep   #$30
 
                   lda   KEY
-                  bpl   :no_key
+                  bpl   MenuLoop
                   sta   STROBE
-                  lda   SL_selected
-                  sta   $c034
+
                   lda   KEY
-                  cmp   #'w'
-                  bne   :not_up
-:up               rep   #$30
-                  jsr   SL_DecSelected
+                  ldx   #0                      ; counter
+:find_key         cmp   MenuActions,x
+                  beq   :found_key
+                  inx
+                  cpx   #MenuActionsCount
+                  bne   :find_key
+                  bra   :not_down
+
+:found_key        rep   $30
+                  txa
+                  and   #$00FF
+                  asl
+                  tay
+                  lda   MenuRoutines,y
+                  sta   :jump+1
+
+
+:jump             jsr   $0000
+
                   bra   MenuLoop
-:not_up           mx    %11
-                  cmp   #'s'
-                  bne   :not_down
-:down             rep   #$30
-                  jsr   SL_IncSelected
-:not_down
+:not_down         sep   #$30
+
+:debug            jsr   Debug_Hex               ;
+                  clc
+                  xce
+
 :no_key           rep   #$30
                   bra   MenuLoop
 ******************************************************************  <<<<<<<<<<<<<<
 
+
+
+* x = index to a directory entry
+SetPtr0toDirEntry mx    %00
+                  lda   #DirList                ; start w pointer at beginning of list
+                  cpx   #0
+                  beq   :continue               ; no need to add anything
+                  clc
+:calc_item_start  adc   #DirListEntrySize
+                  dex
+                  bne   :calc_item_start
+:continue         sta   0                       ; address of string at zero
+                  rts
+
+
+MenuEnterSelected mx    %00
+                  jsr   SL_GetSelected
+                  tax
+                  jsr   SetPtr0toDirEntry
+
+                  sep   $30
+
+                  ldy   #$10
+                  lda   (0),y                   ; type
+
+:t0               cmp   #$0F
+                  bne   :not_dir
+                  jsr   MenuHandlePrefixChange
+                  rts
+
+:not_dir
+                  inc   $c022
+                  rts
+
+MenuActionsCount  =     7
+MenuActions       db    #'w'
+                  db    #'W'
+                  db    #$0B                    ; up
+
+                  db    #'s'
+                  db    #'S'
+                  db    #$0A                    ; dn
+
+                  db    #$0D                    ; enter
+
+
+MenuRoutines      da    SL_DecSelected
+                  da    SL_DecSelected
+                  da    SL_DecSelected
+
+                  da    SL_IncSelected
+                  da    SL_IncSelected
+                  da    SL_IncSelected
+
+                  da    MenuEnterSelected
+
+
+
+
+* 8-bit with value in a plz
+Debug_Hex         mx    %11
+                  pha                           ; hex debug
+                  GOXY  #75;#22                 ;
+                  pla                           ;
+                  jmp   $FDDA                   ; implied rts
 
                                                 ; .... TEST CODE ....
                   lda   #$0003                  ; bank 3
@@ -542,6 +653,7 @@ DrawMenuBackground jsr  HOME
 MyString          asc   "Welcome",00
 MouseString       asc   $1B,'@ABCDEFGHIJKLMNOPQRSTUVWXYZXYXY[\]^_',$18,00
 IcoDirString      asc   $1B,'XY',$18," ",$00
+IcoParentString   asc   $1B,'KI',$18," ",$00
 IcoNoString       asc   "   ",$00
 DirListCount      dw    0
 
@@ -569,7 +681,7 @@ TitleStrs
                   asc   $1B,'Z'," /____/  \___/ /_/ /_/ /____/  \___/ /_/   /_/      /_/   \__,_/   \__, /    ",'_',$18,$8D,00
                   asc   $1B,'Z',"                                                                  /____/     ",'_',$18,$8D,00
                   asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
- asc   $1B," ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',$18," ",00
+                  asc   $1B," ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',$18," ",00
                   hex   00,00
 
 

@@ -57,6 +57,16 @@ P8_CLOSE_PCNT     =     1
 *       +-----------------------+
 
 
+********************************************************** SET_PREFIX ($C8)
+P8_SET_PREFIX     =     $C6
+P8_SET_PREFIX_PCNT =    1
+*       +-----------------------+
+*     0 | Number of Parms (1)   |
+*       +-----------------------+-----------------------+
+*    +1 | Pointer to Pathname                           |
+*       +-----------------------+-----------------------+
+
+
 ********************************************************** GET_PREFIX ($C7)
 P8_GET_PREFIX     =     $C7
 P8_GET_PREFIX_PCNT =    1
@@ -130,6 +140,86 @@ _PT_GetPrefix     mx    %00
                   rts
 
 
+* Returns buffer location in A
+PT_SetPrefix      MAC
+                  jsr   _PT_SetPrefix
+                  <<<
+
+_PT_SetPrefix     mx    %00
+                  lda   #PT_PREFIX_BUFFER       ; set result buffer
+                  sta   _PT_PARMTABLE+1
+                  sep   #$30
+                  lda   #P8_SET_PREFIX          ; set up SET_PREFIX call
+                  sta   PT_P8CALL_NUM
+                  lda   #P8_GET_PREFIX_PCNT     ; build SET_PREFIX parm table
+                  sta   _PT_PARMTABLE
+                  jsr   PT_P8CALL               ; returns in emulation 8-bit mode
+                  clc
+                  xce
+                  rep   #$30
+                  lda   #PT_PREFIX_BUFFER
+                  rts
+
+PT_RemovePrefix   MAC
+                  jsr   _PT_RemovePrefix
+                  <<<
+
+_PT_RemovePrefix  sep   $30
+                  ldx   PT_PREFIX_BUFFER
+                  cpx   #1
+                  bcs   :remove
+:too_short        rts
+:remove           dex                           ; remove trailing slash
+                  lda   PT_PREFIX_BUFFER,x
+                  cmp   #'/'
+                  beq   :slash
+:no_slash
+                  cpx   #1
+                  bne   :remove
+                  rts
+:slash
+:store_new_len    stx   PT_PREFIX_BUFFER
+                  rep   $30
+                  rts
+
+
+
+PT_AppendPrefix   MAC
+
+                  rep   $30
+                  lda   ]1
+                  jsr   _PT_AppendPrefix
+                  <<<
+
+* a = ptr to prodos string
+_PT_AppendPrefix  mx    %00
+                  sta   PT_TMP_PTR
+                  sep   $30
+                  ldy   #0
+                  lda   (PT_TMP_PTR),y          ; length of append string
+                  inc                           ; +1 skip len byte
+                  sta   :copy_len+1             ; smc - this many bytes to copy
+
+                  lda   PT_PREFIX_BUFFER        ; get length Byte
+                  inc                           ; +1 skip len byte
+                  tax                           ; to index
+
+                  ldy   #0
+                  lda   (PT_TMP_PTR),y          ; length of append string
+
+                  clc
+                  adc   PT_PREFIX_BUFFER        ; add to prefix len
+                  sta   PT_PREFIX_BUFFER        ; now length in memory is updated (orig still in x)
+
+                  ldy   #1
+:copy_char        lda   (PT_TMP_PTR),y
+                  sta   PT_PREFIX_BUFFER,x
+                  iny
+                  inx
+:copy_len         cpy   #0                      ; smc
+                  bne   :copy_char
+                  rep   $30
+                  rts
 
 *PT_LoadFilenameToPtr 'ntpplayer';0     ; address in 0
 * ]1 = pathname
@@ -395,7 +485,30 @@ _PT_ReadDir       mx    %00
 :init             clc
                   xce
                   rep   $30
+
+                  if    NO_SEED_PARENT          ; now we actually start with a parent entry ("..")
                   stz   _PT_ReadDirCount
+                  else
+                  lda   #1
+                  sta   _PT_ReadDirCount
+                  lda   #2                      ; str len
+                  ldy   #0
+                  sta   [PT_DST_PTR],y
+                  lda   #'.'
+                  iny
+                  sta   [PT_DST_PTR],y
+                  iny
+                  sta   [PT_DST_PTR],y
+                  lda   #$0f                    ; type
+                  ldy   #$10
+                  sta   [PT_DST_PTR],y
+
+                  lda   PT_DST_PTR              ; advance pty
+                  clc
+                  adc   #DirListEntrySize       ; @todo this is defined outside of this file, redefine locally.
+                  sta   PT_DST_PTR              ; doesn't cross banks (16bit) so your buffer shouldn't either
+                  fin
+
                   sep   $30
                   lda   #1
                   sta   _PT_EXPECT_EOF
@@ -500,19 +613,8 @@ _PT_NextEntry     dec   _PT_DIR_ENTRIES_REMAINING
                   jsr   CloneEntryToPTDirList
 
 
-***********************************;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  prolly trash and debug crap
-*                  ldy   #$00
-*                  lda   (PT_DIR_ENTRY_PTR),y
-*                  and   #$F0
-*                  cmp   #$00
-*                  beq   _PT_NextEntry           ; skip inactive entry
-                                                ;cmp   #$D0
-                                                ;beq   _PT_NextEntry           ; skip subdirectory
-*                  ldy   #$10
-*                  lda   (PT_DIR_ENTRY_PTR),y
-
-                  if DEBUG
-                  jsr   DisplayFile  
+                  if    DEBUG
+                  jsr   DisplayFile
                   fin
 ***********************************;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
                   bra   _PT_NextEntry

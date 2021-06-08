@@ -42,9 +42,8 @@ SL_SETRENDERFUNCTION MAC
                   <<<
 
 
-SL_CalculateOffset
-:bound_checking                                 ; sets offset to zero if OOB
-                  lda   SL_selected
+SL_CalculateOffset mx   %00
+:bound_checking   lda   SL_selected             ; sets offset to zero if OOB
                   cmp   #$FFFF                  ; -1 = none  @TODO ASSEMBLER ISSUE?  F0FF ??????!!!!
                   beq   :zero_offset
                   cmp   SL_itemscount           ; make sure we're not over
@@ -53,24 +52,24 @@ SL_CalculateOffset
 :zero_offset      stz   SL_offset               ; OOB - zero offset
                   rts
 
-:calc_offset
-                  cmp   SL_windowsize_ydiv2     ; is selected over half the value of the window height (5)
+:calc_offset      cmp   SL_windowsize_ydiv2     ; is selected over half the value of the window height (5)
                   bcc   :zero_offset            ; otherwise don't scroll - zero
                   sec
                   sbc   SL_windowsize_ydiv2
                   sta   SL_offset
 
-:eol_check
-                  lda   SL_itemscount
+:eol_check        lda   SL_itemscount
                   sec
                   sbc   SL_windowsize_y
                   cmp   SL_offset
                   bcc   :over_eol
                   rts                           ; we're ok
+
 :over_eol         sta   SL_offset
                   rts
 
-SL_IncSelected                                  ; brk $23
+
+SL_IncSelected    mx    %00
                   inc   SL_selected
                   lda   SL_selected
                   cmp   SL_itemscount
@@ -78,15 +77,18 @@ SL_IncSelected                                  ; brk $23
 :over             dec   SL_selected
 :ok               rts
 
-SL_DecSelected
+
+SL_DecSelected    mx    %00
                   lda   SL_selected
                   beq   :already_zero
 :ok               dec   SL_selected
 :already_zero     rts
 
 
+SL_GetSelected    mx    %00
+                  lda   SL_selected
+                  rts
 
-*
 SL_DrawWindow     mx    %00
                   lda   SL_offset               ; 16-bit
                   sta   SL_cur_off
@@ -141,7 +143,7 @@ SL_cur_off        dw    0                       ;
 
 * assume cursor xy is set for string printing
 * a = item index   -  uses 0 and 2 on dp
-SL_DemoList1RenderItem mx %00                      
+SL_DemoList1RenderItem mx %00
                   cmp   SL_itemscount           ; see if item exists
                   bcc   :exists
                   stz   2                       ; uninvert if blank
