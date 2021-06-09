@@ -18,6 +18,18 @@ P8_DIR_ENT_OFFSET_TYPE = $10
 P8_DIR_ENT_OFFSET_LEN = $15                     ; $15-17
 
 
+********************************************************** ONLINE ($C5)
+P8_ONLINE         =     $C5
+P8_ONLINE_PCNT    =     2
+*       +-----------------------+
+*     0 | Number of Parms (2)   |
+*       +-----------------------+
+*    +1 | Unit Number Code      |
+*       +-----------------------------------------------+
+*    +3 | Pointer to Data Buffer                        |
+*       +-----------------------+-----------------------+
+
+
 ********************************************************** OPEN ($C8)
 P8_OPEN           =     $C8
 P8_OPEN_PCNT      =     3
@@ -30,6 +42,7 @@ P8_OPEN_PCNT      =     3
 *       +-----------------------+-----------------------+
 *    +5 | Reference Number      |  <- result
 *       +-----------------------+
+
 
 ********************************************************** READ ($CA)
 P8_READ           =     $CA
@@ -140,6 +153,17 @@ _PT_GetPrefix     mx    %00
                   rts
 
 
+
+PT_ReadVols       MAC
+                  jsr   _PT_ReadVols
+                  <<<
+
+_PT_ReadVols      mx    %00
+
+                  rts
+
+
+
 * Returns buffer location in A
 PT_SetPrefix      MAC
                   jsr   _PT_SetPrefix
@@ -160,6 +184,7 @@ _PT_SetPrefix     mx    %00
                   lda   #PT_PREFIX_BUFFER
                   rts
 
+* return prefix length in x
 PT_RemovePrefix   MAC
                   jsr   _PT_RemovePrefix
                   <<<
@@ -176,6 +201,7 @@ _PT_RemovePrefix  sep   $30
 :no_slash
                   cpx   #1
                   bne   :remove
+                  rep   $30
                   rts
 :slash
 :store_new_len    stx   PT_PREFIX_BUFFER

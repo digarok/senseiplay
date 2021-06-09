@@ -90,6 +90,13 @@ MenuRefreshDirList mx   %00
                   sta   DirListCount
                   rts
 
+MenuRefreshDirListVols mx %00
+                  stz   SL_selected             ; always zero
+                  >>>   PT_SetDirListPtr,DirList ; tell PT where we want our directory list
+                  >>>   PT_ReadVols
+                  sta   DirListCount
+                  rts
+
 
 PrefixSlashStr    db    1,#'/'
 MenuHandlePrefixChange mx %11
@@ -98,7 +105,13 @@ MenuHandlePrefixChange mx %11
                   cmp   #'.'                     ; is it "parent"?
                   bne   :normal_dir
 :parent_dir       >>>   PT_RemovePrefix
-                  bra   :read_dir
+                  mx    %00
+
+                  lda   PT_PREFIX_BUFFER
+                  and   #$00FF
+                  cmp   #1
+                  bne   :read_dir
+:read_vols        jsr   MenuRefreshDirListVols
 :normal_dir       >>>   PT_AppendPrefix,0
                   >>>   PT_AppendPrefix,#PrefixSlashStr
 :read_dir         >>>   PT_SetPrefix

@@ -43,8 +43,11 @@ SL_SETRENDERFUNCTION MAC
 
 
 SL_CalculateOffset mx   %00
-:bound_checking   lda   SL_selected             ; sets offset to zero if OOB
-                  cmp   #$FFFF                  ; -1 = none  @TODO ASSEMBLER ISSUE?  F0FF ??????!!!!
+:bound_checking   lda   SL_itemscount           ; if fewer items..
+                  cmp   SL_windowsize_y         ;   than window height... then zero
+                  bcc   :zero_offset
+                  lda   SL_selected             ; sets offset to zero if OOB
+                  cmp   #$FFFF                  ; -1 = none
                   beq   :zero_offset
                   cmp   SL_itemscount           ; make sure we're not over
                   bcc   :calc_offset            ; all clear - do the calculation
