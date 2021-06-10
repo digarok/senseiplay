@@ -58,29 +58,23 @@ STROBE            equ   $C010
                   org   $2000                   ; start at $2000 (all ProDOS8 system files)
                   typ   $ff
                   mx    %11
-
-                  sep   #$30
-                  lda   #$A0                    ;USE A BLANK SPACE TO
-                  jsr   $C300                   ;TURN ON THE VIDEO FIRMWARE
-                  GOXY  #5;#15
-                  PRINTSTR MouseString
-
+                
+                  sep $30
+                  jsr   Setup80Col
                   jsr   DrawMenuBackground
+
+                  ;GOXY  #5;#15
+                  ;PRINTSTR MouseString
 
                   clc
                   xce
                   rep   #$30
 
-
                   jsr   PrepareTools
                   jsr   PrepareNTP
                   >>>   PT_GetPrefix            ; returns ptr in A ...
                                                 ; >>>   PT_PrintProdosStr ; "/SENSEIPLAY/" is where we start
-
                   jsr   MenuRefreshDirList
-                                                ;  >>>   PT_SetDirListPtr,DirList ; tell PT where we want our directory list
-                                                ;  >>>   PT_ReadDir              ; returns count in A
-                                                ;  sta   DirListCount
                   brl   MenuLoop
 
 MenuRefreshDirList mx   %00
@@ -90,15 +84,14 @@ MenuRefreshDirList mx   %00
                   sta   DirListCount
                   rts
 
-MenuRefreshDirListVols mx %00
+MenuRefreshDirListOnline mx %00
                   stz   SL_selected             ; always zero
                   >>>   PT_SetDirListPtr,DirList ; tell PT where we want our directory list
-                  >>>   PT_ReadVols
+                  >>>   PT_ReadOnline
                   sta   DirListCount
                   rts
 
 
-PrefixSlashStr    db    1,#'/'
 MenuHandlePrefixChange mx %11
                   ldy   #1
                   lda   (0),y                   ; get first char
@@ -109,10 +102,15 @@ MenuHandlePrefixChange mx %11
 
                   lda   PT_PREFIX_BUFFER
                   and   #$00FF
-                  cmp   #1
+                  cmp   #1                      ; if we're at "/" root then read online volumes
                   bne   :read_dir
-:read_vols        jsr   MenuRefreshDirListVols
-:normal_dir       >>>   PT_AppendPrefix,0
+:read_online      jsr   MenuRefreshDirListOnline
+                  brl   MenuLoop
+:normal_dir       sep   $30
+                  lda   (0)                     ;\
+                  and   #$0F                    ; > clear any volume data in high nibble
+                  sta   (0)                     ;/
+                  >>>   PT_AppendPrefix,0
                   >>>   PT_AppendPrefix,#PrefixSlashStr
 :read_dir         >>>   PT_SetPrefix
                   jsr   MenuRefreshDirList
@@ -156,24 +154,31 @@ DirectoryRenderItem mx  %00
                   jsr   SetPtr0toDirEntry       ; this calculates the pointer to our entry and stores it at $0
                   sep   #$30
 
+                  lda   (0)                     ; volume "type" is denoted by drive info in high nibble of len byte
+                  cmp   #$10
+                  bcs   :volume_dir
+
                   ldy   #$10
                   lda   (0),y                   ; type
-
 :t0               cmp   #$0F                    ; dir?
-                  bne   :t1
+                  bne   :not_dir
 
                   ldy   #1
                   lda   (0),y                   ; get first char
                   cmp   #'.'                     ; is it "parent"?
                   bne   :normal_dir
+
 :parent_dir       PRINTSTR IcoParentString
+                  bra   :continue2
+:volume_dir       PRINTSTR IcoVolString
                   bra   :continue2
 :normal_dir       PRINTSTR IcoDirString
                   bra   :continue2
-:t1
+:not_dir
                   PRINTSTR IcoNoString
 :continue2
                   lda   (0)                     ; get len byte
+                  and   #$0F
                   tax                           ;  .. counter
                   ldy   #1                      ; start printing at byte 1
 :pr_loop          lda   (0),y
@@ -272,7 +277,12 @@ MenuEnterSelected mx    %00
 
                   sep   $30
 
-                  ldy   #$10
+
+:check_is_vol     lda   (0)                     ; volume "type" is denoted by drive info in high nibble of len byte
+                  cmp   #$10
+                  bcc   :check_is_dir
+                  jsr   MenuHandlePrefixChange
+:check_is_dir     ldy   #$10
                   lda   (0),y                   ; type
 
 :t0               cmp   #$0F
@@ -280,7 +290,8 @@ MenuEnterSelected mx    %00
                   jsr   MenuHandlePrefixChange
                   rts
 
-:not_dir
+:not_dir          jsr   LoadNTP
+
                   inc   $c022
                   rts
 
@@ -316,6 +327,8 @@ Debug_Hex         mx    %11
                   pla                           ;
                   jmp   $FDDA                   ; implied rts
 
+
+*********************************************************
                                                 ; .... TEST CODE ....
                   lda   #$0003                  ; bank 3
                   sta   $02                     ; dp ptr hi
@@ -323,6 +336,20 @@ Debug_Hex         mx    %11
                   PT_LoadFilenameToPtr 'ntp/engine.ntp';0
                   jsr   StartMusic
                   FUNHALT
+                
+LoadNTP         mx %11
+    clc
+    xce
+    rep $30
+                      >>>   PT_GetPrefix            ; returns ptr in A ...
+                                                ; >>>   PT_PrintProdosStr ; "/SENSEIPLAY/" is where we start
+             lda   #$0003                  ; bank 3
+                  sta   $06                     ; dp ptr hi
+                  stz   $04                     ; dp ptr lo
+                  PT_LoadFilePtrToPtr 0;4
+                  jsr   StartMusic
+                  FUNHALT
+                  mx    %00
                   mx    %00
 
 StartMusic        lda   #$0003
@@ -508,14 +535,6 @@ NTPforcesongpos   =     NinjaTrackerPlus+15     ; tool does not use
 NTPgetsongpos     =     NinjaTrackerPlus+18     ; tool does not use
 
 
-
-                  mx    %11                     ; we don't know actually
-RANDOPAUSE        sec
-                  xce
-                  sep   #$30
-                  stal  $00c034
-:lp               bra   :lp
-
 FUNHALT           MAC
                   sec
                   xce
@@ -526,7 +545,7 @@ FUNHALT           MAC
                   lda   #$f6
                   sta   $c022
 :skip             lda   #$db
-                  jsr   $fdda
+;                  jsr   $fdda
 
                   lda   $c022
                   clc
@@ -651,23 +670,30 @@ PrintStringsX     stx   _printstringsx_horiz
                   inc   $1
 :nocarry          bra   :loop
 
-
 :done             rts
 
 _printstringsx_horiz db 00
 
-DrawMenuBackground jsr  HOME
+Setup80Col        mx    %11
+                  lda   #$A0                    ;USE A BLANK SPACE TO
+                  jsr   $C300                   ;TURN ON THE VIDEO FIRMWARE
+                  rts
+
+DrawMenuBackground mx   %11
+                  jsr   HOME
                   lda   #TitleStrs
                   ldy   #>TitleStrs
                   ldx   #00                     ; horiz pos
-                  jsr   PrintStringsX
-                  rts
+                  jmp   PrintStringsX           ; implied rts
 
 MyString          asc   "Welcome",00
 MouseString       asc   $1B,'@ABCDEFGHIJKLMNOPQRSTUVWXYZXYXY[\]^_',$18,00
 IcoDirString      asc   $1B,'XY',$18," ",$00
 IcoParentString   asc   $1B,'KI',$18," ",$00
+IcoVolString      asc   $1B,'Z^',$18," ",$00
 IcoNoString       asc   "   ",$00
+PrefixSlashStr    str   '/' 
+
 DirListCount      dw    0
 
 TitleStrs

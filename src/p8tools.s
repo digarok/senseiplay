@@ -154,11 +154,70 @@ _PT_GetPrefix     mx    %00
 
 
 
-PT_ReadVols       MAC
-                  jsr   _PT_ReadVols
+PT_ReadOnline     MAC
+                  jsr   _PT_ReadOnline
                   <<<
 
-_PT_ReadVols      mx    %00
+_PT_ReadOnline    mx    %00
+                  stz   _PT_ReadDirCount        ; zero result count
+                  lda   #P8_DATA_BUFFER         ; set result buffer
+                  sta   _PT_PARMTABLE+2
+                  sep   #$30
+                  stz   _PT_PARMTABLE+1         ; zero unit number will return all
+                  lda   #P8_ONLINE              ; set up GET_PREFIX call
+                  sta   PT_P8CALL_NUM
+                  lda   #P8_ONLINE_PCNT         ; build GET_PREFIX parm table
+                  sta   _PT_PARMTABLE
+                  jsr   PT_P8CALL               ; returns in emulation 8-bit mode
+
+                  clc
+                  xce
+                  rep   #$30
+                  lda   #P8_DATA_BUFFER
+                  sta   PT_TMP_PTR
+
+
+:read_online_entry ldy  #0
+                  lda   (PT_TMP_PTR),y
+                  and   #$0f
+                  beq   :no_more_entries
+
+                  ldx   #$0F                    ; 16 bytes
+:copy_entry
+                  lda   (PT_TMP_PTR),y
+                  sta   [PT_DST_PTR],y          ; this doesn't make sense but it doesn't matter either
+                  iny
+                  dex
+                  bpl   :copy_entry
+:inc_ptrs         lda   PT_TMP_PTR
+                  clc
+                  adc   #$10
+                  sta   PT_TMP_PTR
+                  lda   PT_DST_PTR
+                  clc
+                  adc   #DirListEntrySize
+                  sta   PT_DST_PTR
+                  inc   _PT_ReadDirCount
+                  bra   :read_online_entry
+
+:no_more_entries  rep   $30
+                  lda   _PT_ReadDirCount
+                  rts
+                                                ;;; <<< CONVERT TO DIR ENTRIES.  MAYBE USE HIGH NIBBLE FOR VOLUME CRUD LIKE UNIT/DRIVE NUMBER
+*0d00.0df0
+*00/0D00:B3 52 41 4D 00 00 00 00 00 00 00 00 00 00 00 00-3RAM............
+*00/0D10:74 47 53 4F 53 00 00 00 00 00 00 00 00 00 00 00-tGSOS...........
+*00/0D20:5A 53 45 4E 53 45 49 50 4C 41 59 00 00 00 00 00-ZSENSEIPLAY.....
+*00/0D30:D0 2F 00 00 00 00 00 00 00 00 00 00 00 00 00 00-P/..............
+*00/0D40:60 27 00 00 00 00 00 00 00 00 00 00 00 00 00 00-`'..............
+*00/0D50:E0 27 00 00 00 00 00 00 00 00 00 00 00 00 00 00-`'..............
+*00/0D60:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00-................
+
+*...
+*00/0DE0:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00-................
+*00/0DF0:00-.
+*
+
 
                   rts
 
@@ -246,6 +305,28 @@ _PT_AppendPrefix  mx    %00
                   bne   :copy_char
                   rep   $30
                   rts
+
+* PT_LoadFilePtrToPtr 0;4     ; ptr to str filename in 0; dest address in 4
+* ]1 = DP pointer to pathname
+* ]2 = DP pointer           <- points to destination
+PT_LoadFilePtrToPtr MAC
+                     mx %00
+
+                                       ldx   ]1 ; load first to prevent clobbering
+                        
+                     lda   ]2
+                     sta   PT_DST_PTR
+                     lda   ]2+2
+                     sta   PT_DST_PTR+2
+
+                     txa    ;restore
+
+
+                  jsr   _PT_LoadFile
+                  bra   _done
+_done
+                  <<<
+
 
 *PT_LoadFilenameToPtr 'ntpplayer';0     ; address in 0
 * ]1 = pathname
@@ -705,7 +786,7 @@ CloneEntryToPTDirList mx %11
                   sta   PT_DST_PTR              ; doesn't cross banks (16bit) so your buffer shouldn't either
 
                   inc   _PT_ReadDirCount
-                  inc   $c034
+                                                ;inc   $c034
                   rts
 
 
@@ -739,4 +820,4 @@ CloneEntryToPTDirList mx %11
 *00/0D58:00 00 00 00 00 00 00 00-........
 *00/0D60:00-.
                   FIN
-              
+
