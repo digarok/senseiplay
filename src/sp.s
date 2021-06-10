@@ -262,17 +262,143 @@ MenuLoop          clc
 ******************************************************************  <<<<<<<<<<<<<<
 
 PlayerLoop        mx    %00
+                  
+:key_loop         jsr   ShowTrackPos
+                  jsr   ShowVUs
                   sep   $30
-:key_loop         lda   KEY
-
+                  lda   KEY
                   bpl   :key_loop
                   sta   STROBE
+
+:cleanup          jsr   DrawMenuBackground
+
                   clc
                   xce
                   rep   $30
 
                   jsr   _NTPstop
+
+
                   rts
+
+ShowVUs           clc
+                  xce
+                  rep   $30
+                  jsr   _NTPgetvuptr
+                  stx   0
+                  sty   2
+                  lda   [0]                     ; number of tracks
+                  tax                           ; counter
+                  ldy   #2                      ; index of first track
+:vu_loop          lda   [0],y
+                  jsr   RenderVU
+                  iny
+                  iny
+                  dex
+                  bne   :vu_loop
+                  rts
+
+* y = vu number   a = value
+RenderVU          mx    %00
+                  phx
+                  phy
+                  sep   $30
+                  pha
+                  tya
+                  asl                           ; now *4
+                  sta   8
+                  GOXY  8;#15
+                  pla
+                  jsr   $FDDA
+
+                  clc
+                  xce
+                  rep   $30
+
+                  ply
+                  plx
+                  rts
+
+
+ShowTrackPos      clc
+                  xce
+                  rep   $30
+                  jsr   _NTPgetsongpos
+                  stx   0
+                  sty   2
+                  sep   $30
+
+
+                                                ; bg area pre-drawn at start
+                  GOXY  #36;#1                  ; cursor
+                  ldy   #7                      ; pat
+                  lda   [0],y
+                  jsr   $FDDA
+                  GOXY  #46;#1                  ; cursor
+                  ldy   #8                      ; pos
+                  lda   [0],y
+                  jsr   $FDDA
+
+
+                  GOXY  #10;#22                 ;;; debug show track pos
+                  ldy   #2
+                  ldal  [0],y
+                  jsr   $FDDA
+                  ldy   #3
+                  ldal  [0],y
+                  jsr   $FDDA
+
+                  lda   #" "
+                  jsr   $FDED
+                  ldy   #4
+                  ldal  [0],y
+                  jsr   $FDDA
+                  ldy   #5
+                  ldal  [0],y
+                  jsr   $FDDA
+
+                  lda   #" "
+                  jsr   $FDED
+                  ldy   #6
+                  ldal  [0],y
+                  jsr   $FDDA
+                  ldy   #7
+                  ldal  [0],y
+                  jsr   $FDDA
+
+                  lda   #" "
+                  jsr   $FDED
+                  ldy   #8
+                  ldal  [0],y
+                  jsr   $FDDA
+                  ldy   #9
+                  ldal  [0],y
+                  jsr   $FDDA
+
+                  lda   #" "
+                  jsr   $FDED
+                  lda   #" "
+                  jsr   $FDED
+                  lda   #" "
+                  jsr   $FDED
+                  ldy   #10
+                  ldal  [0],y
+                  jsr   $FDDA
+                  ldy   #11
+                  ldal  [0],y
+                  jsr   $FDDA
+
+                  lda   #" "
+                  jsr   $FDED
+                  ldy   #12
+                  ldal  [0],y
+                  jsr   $FDDA
+                  ldy   #13
+                  ldal  [0],y
+                  jsr   $FDDA
+                  rts                           ; should return in 8-bit
+
+
 
 
 * x = index to a directory entry
@@ -308,7 +434,18 @@ MenuEnterSelected mx    %00
 
 :not_dir          jsr   LoadNTP
                   jsr   StartMusic
+                  bcs   :err
+                  jsr   PlayerUi
                   jsr   PlayerLoop
+:err
+                  rts
+PlayerUi          mx    %00
+                  sep   $30
+                  GOXY  #30;#1                  ; title pat/pos
+                  PRINTSTR PatPosString
+                  clc
+                  xce
+                  rep   $30
                   rts
 
 MenuActionsCount  =     7
@@ -370,10 +507,38 @@ StartMusic        mx    %00
                   ldy   #$0003
                   ldx   #0
                   jsr   _NTPprepare
-                  bcc   ok
-                  brk   $ee                     ;@todo?
-ok                lda   #0
+                  bcc   :ok
+
+                  jsr   HoldUp
+                  sec
+                  rts
+
+:ok               lda   #0
                   jsr   _NTPplay
+                  clc
+                  rts
+
+
+HoldUp            mx    %00
+                  sep   $30
+                  lda   $c034
+                  pha
+
+
+                  ldy   #80                     ; delay
+
+:wait_vbl_start   lda   $c019
+                  bpl   :wait_vbl_start
+:wait_vbl_end     inc   $c034
+                  lda   $c019
+                  bmi   :wait_vbl_end
+
+                  lda   #1
+                  sta   $c034
+                  dey
+                  bne   :wait_vbl_start
+                  pla
+                  sta   $c034
                   rts
 
 
@@ -697,6 +862,7 @@ DrawMenuBackground mx   %11
 
 MyString          asc   "Welcome",00
 MouseString       asc   $1B,'@ABCDEFGHIJKLMNOPQRSTUVWXYZXYXY[\]^_',$18,00
+PatPosString      asc   $1B,'_',"Pat:    ",'\'," Pos:   ",'Z',$18,00
 IcoDirString      asc   $1B,'XY',$18," ",$00
 IcoParentString   asc   $1B,'KI',$18," ",$00
 IcoVolString      asc   $1B,'Z^',$18," ",$00
