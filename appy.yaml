@@ -1,4 +1,4 @@
-assemble: [src/sp.s]
+assemble: [src/sp.s,ninjatrackerplus/ninjatrackerplus.s]
 disks:
 - name: senseiplay
   file: senseiplay800.2mg
@@ -8,7 +8,7 @@ disks:
     output: /senseiplay        
   - input: src/sp.s
     output: /senseiplay/src
-  - input: ntp/ntpplayer
+  - input: ninjatrackerplus/ntpplayer
     output: /senseiplay
   - input: ../modsearch/potential/eclipse.ntp
     output: /senseiplay

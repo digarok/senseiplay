@@ -132,6 +132,7 @@ _PT_PrintProdosStr mx   %00
                   rts
 
 
+
 * Returns buffer location in A
 PT_GetPrefix      MAC
                   jsr   _PT_GetPrefix
@@ -176,7 +177,6 @@ _PT_ReadOnline    mx    %00
                   lda   #P8_DATA_BUFFER
                   sta   PT_TMP_PTR
 
-
 :read_online_entry ldy  #0
                   lda   (PT_TMP_PTR),y
                   and   #$0f
@@ -203,24 +203,7 @@ _PT_ReadOnline    mx    %00
 :no_more_entries  rep   $30
                   lda   _PT_ReadDirCount
                   rts
-                                                ;;; <<< CONVERT TO DIR ENTRIES.  MAYBE USE HIGH NIBBLE FOR VOLUME CRUD LIKE UNIT/DRIVE NUMBER
-*0d00.0df0
-*00/0D00:B3 52 41 4D 00 00 00 00 00 00 00 00 00 00 00 00-3RAM............
-*00/0D10:74 47 53 4F 53 00 00 00 00 00 00 00 00 00 00 00-tGSOS...........
-*00/0D20:5A 53 45 4E 53 45 49 50 4C 41 59 00 00 00 00 00-ZSENSEIPLAY.....
-*00/0D30:D0 2F 00 00 00 00 00 00 00 00 00 00 00 00 00 00-P/..............
-*00/0D40:60 27 00 00 00 00 00 00 00 00 00 00 00 00 00 00-`'..............
-*00/0D50:E0 27 00 00 00 00 00 00 00 00 00 00 00 00 00 00-`'..............
-*00/0D60:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00-................
-
-*...
-*00/0DE0:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00-................
-*00/0DF0:00-.
-*
-
-
-                  rts
-
+                        
 
 
 * Returns buffer location in A
@@ -242,6 +225,7 @@ _PT_SetPrefix     mx    %00
                   rep   #$30
                   lda   #PT_PREFIX_BUFFER
                   rts
+
 
 * return prefix length in x
 PT_RemovePrefix   MAC
@@ -270,7 +254,6 @@ _PT_RemovePrefix  sep   $30
 
 
 PT_AppendPrefix   MAC
-
                   rep   $30
                   lda   ]1
                   jsr   _PT_AppendPrefix
@@ -439,131 +422,6 @@ PT_P8_ERROR
                   jsr   P8_PRHEX
                   jsr   P8_CROUT2
                   wai                           ; HALT
-
-** reusable parm table
-_PT_REFNUM        dw    0                       ; reusable reference number for a single open file (only uses a byte but padded for 16-bit code)
-_PT_PATHNAME_PTR  da    0                       ; reusable pointer to pathname of current file being worked with
-_PT_PARMTABLE     ds    16                      ; this is a reusable P8 parameter table to be filled out dynamically
-
-** used for scanning directory/volume entries
-_PT_DIR_ENTRY_LENGTH db 0                       ; length in bytes of each entry in the directory
-_PT_DIR_ENTRIES_PER_BLOCK db 0                  ; number of entries stored in each block of the directory file
-_PT_DIR_ENTRIES_REMAINING db 0                  ; used to track remaining entries when scanning dir blocks
-
-_PT_EXPECT_EOF    db    0                       ;
-
-
-******************************************
-* ToolCall Macros                        *
-******************************************
-Tool              MAC
-                  LDX   #]1
-                  JSL   $E10000
-                  <<<
-_TLStartUp        MAC
-                  Tool  $201
-                  <<<
-_TLShutDown       MAC
-                  Tool  $301
-                  <<<
-_NewHandle        MAC
-                  Tool  $902
-                  <<<
-_MMStartUp        MAC
-                  Tool  $202
-                  <<<
-_GetMasterId      MAC
-                  Tool  $2003
-                  <<<
-_MTStartUp        MAC
-                  Tool  $203
-                  <<<
-
-_TLTextMountVol   MAC
-                  Tool  $1201
-                  <<<
-_UnPackBytes      MAC
-                  Tool  $2703
-                  <<<
-
-LoadLongXY        MAC
-                  LDX   #^]1
-                  LDY   #]1
-                  <<<
-
-PushLongXY        MAC
-                  PHX
-                  PHY
-                  <<<
-
-PushLong          MAC
-                  IF    #=]1
-                  PushWord #^]1
-                  ELSE
-                  PushWord ]1+2
-                  FIN
-                  PushWord ]1
-                  <<<
-
-PushWord          MAC
-                  IF    #=]1
-                  PEA   ]1
-                  ELSE
-                  IF    MX/2
-                  LDA   ]1+1
-                  PHA
-                  FIN
-                  LDA   ]1
-                  PHA
-                  FIN
-                  <<<
-Tool              MAC
-                  LDX   #]1
-                  JSL   $E10000
-                  <<<
-
-
-****************************************
-* AllocOneBank                         *
-* This is a custom allocation function *
-* that makes use of the fact that we   *
-* request an entire locked bank and so *
-* simply returns the bank in the       *
-* accumulator. (basically dereference  *
-* the Handle to get the pointer)       *
-****************************************
-AllocOneBank      mx    %00
-                  PushLong #0
-                  PushLong #$10000
-                  PushWord UserId
-                  PushWord #%11000000_00011100
-                  PushLong #0
-                  _NewHandle                    ; returns LONG Handle on stack
-                  plx                           ; base address of the new handle
-                  pla                           ; high address 00XX of the new handle (bank)
-                  xba                           ; swap accumulator bytes to XX00
-                  sta   :bank+2                 ; store as bank for next op (overwrite $XX00)
-:bank             ldal  $000001,X               ; recover the bank address in A=XX/00
-                  rts
-
-
-
-* X/Y = length in bytes (24bit)
-AllocContiguousPageAlign mx %00
-                  PushLong #0                   ; result space
-                  PushLongXY
-                  PushWord UserId
-                  PushWord #%11000000_00001100
-
-                  PushLong #0
-                  _NewHandle                    ; returns LONG Handle on stack
-                  _Err
-                  plx                           ; base address of the new handle
-                  pla                           ; high address 00XX of the new handle (bank)
-                  xba                           ; swap accumulator bytes to XX00
-                  sta   :bank+2                 ; store as bank for next op (overwrite $XX00)
-:bank             ldal  $000001,X               ; recover the bank address in A=XX/00
-                  rts
 
 
 
@@ -779,7 +637,6 @@ CloneEntryToPTDirList mx %11
                   pla
                   sta   [PT_DST_PTR],y
 
-
 :advanceDstPtr    lda   PT_DST_PTR
                   clc
                   adc   #DirListEntrySize       ; @todo this is defined outside of this file, redefine locally.
@@ -793,6 +650,142 @@ CloneEntryToPTDirList mx %11
 
 
 
+** reusable parm table
+_PT_REFNUM        dw    0                       ; reusable reference number for a single open file (only uses a byte but padded for 16-bit code)
+_PT_PATHNAME_PTR  da    0                       ; reusable pointer to pathname of current file being worked with
+_PT_PARMTABLE     ds    16                      ; this is a reusable P8 parameter table to be filled out dynamically
+
+** used for scanning directory/volume entries
+_PT_DIR_ENTRY_LENGTH db 0                       ; length in bytes of each entry in the directory
+_PT_DIR_ENTRIES_PER_BLOCK db 0                  ; number of entries stored in each block of the directory file
+_PT_DIR_ENTRIES_REMAINING db 0                  ; used to track remaining entries when scanning dir blocks
+
+_PT_EXPECT_EOF    db    0                       ;
+
+
+
+
+
+
+
+
+
+
+******************************************
+* ToolCall Macros                        *
+******************************************
+Tool              MAC
+                  LDX   #]1
+                  JSL   $E10000
+                  <<<
+_TLStartUp        MAC
+                  Tool  $201
+                  <<<
+_TLShutDown       MAC
+                  Tool  $301
+                  <<<
+_NewHandle        MAC
+                  Tool  $902
+                  <<<
+_MMStartUp        MAC
+                  Tool  $202
+                  <<<
+_GetMasterId      MAC
+                  Tool  $2003
+                  <<<
+_MTStartUp        MAC
+                  Tool  $203
+                  <<<
+
+_TLTextMountVol   MAC
+                  Tool  $1201
+                  <<<
+_UnPackBytes      MAC
+                  Tool  $2703
+                  <<<
+
+LoadLongXY        MAC
+                  LDX   #^]1
+                  LDY   #]1
+                  <<<
+
+PushLongXY        MAC
+                  PHX
+                  PHY
+                  <<<
+
+PushLong          MAC
+                  IF    #=]1
+                  PushWord #^]1
+                  ELSE
+                  PushWord ]1+2
+                  FIN
+                  PushWord ]1
+                  <<<
+
+PushWord          MAC
+                  IF    #=]1
+                  PEA   ]1
+                  ELSE
+                  IF    MX/2
+                  LDA   ]1+1
+                  PHA
+                  FIN
+                  LDA   ]1
+                  PHA
+                  FIN
+                  <<<
+Tool              MAC
+                  LDX   #]1
+                  JSL   $E10000
+                  <<<
+
+
+****************************************
+* AllocOneBank                         *
+* This is a custom allocation function *
+* that makes use of the fact that we   *
+* request an entire locked bank and so *
+* simply returns the bank in the       *
+* accumulator. (basically dereference  *
+* the Handle to get the pointer)       *
+****************************************
+AllocOneBank      mx    %00
+                  PushLong #0
+                  PushLong #$10000
+                  PushWord UserId
+                  PushWord #%11000000_00011100
+                  PushLong #0
+                  _NewHandle                    ; returns LONG Handle on stack
+                  plx                           ; base address of the new handle
+                  pla                           ; high address 00XX of the new handle (bank)
+                  xba                           ; swap accumulator bytes to XX00
+                  sta   :bank+2                 ; store as bank for next op (overwrite $XX00)
+:bank             ldal  $000001,X               ; recover the bank address in A=XX/00
+                  rts
+
+
+
+* X/Y = length in bytes (24bit)
+AllocContiguousPageAlign mx %00
+                  PushLong #0                   ; result space
+                  PushLongXY
+                  PushWord UserId
+                  PushWord #%11000000_00001100
+
+                  PushLong #0
+                  _NewHandle                    ; returns LONG Handle on stack
+                  _Err
+                  plx                           ; base address of the new handle
+                  pla                           ; high address 00XX of the new handle (bank)
+                  xba                           ; swap accumulator bytes to XX00
+                  sta   :bank+2                 ; store as bank for next op (overwrite $XX00)
+:bank             ldal  $000001,X               ; recover the bank address in A=XX/00
+                  rts
+
+
+
+
 
 
 
@@ -801,7 +794,7 @@ CloneEntryToPTDirList mx %11
 
 
                   IF    0
-
+** DIR ENTRIES LOOK LIKE THIS
 *0d00.0d60
 
 *00/0D00:00 00 03 00 FA 53 45 4E-....zSEN
@@ -819,5 +812,21 @@ CloneEntryToPTDirList mx %11
 *00/0D50:02 00 D3 53 52 43 00 00-..SSRC..
 *00/0D58:00 00 00 00 00 00 00 00-........
 *00/0D60:00-.
+
+** ONLINE VOLUME ENTRIES LOOK LIKE THIS
+*  I KEEP THE HIGH NIBBLE FOR NOTING THE VOLUME TYPE AND UNIT NUMBER
+*0d00.0df0
+*00/0D00:B3 52 41 4D 00 00 00 00 00 00 00 00 00 00 00 00-3RAM............
+*00/0D10:74 47 53 4F 53 00 00 00 00 00 00 00 00 00 00 00-tGSOS...........
+*00/0D20:5A 53 45 4E 53 45 49 50 4C 41 59 00 00 00 00 00-ZSENSEIPLAY.....
+*00/0D30:D0 2F 00 00 00 00 00 00 00 00 00 00 00 00 00 00-P/..............
+*00/0D40:60 27 00 00 00 00 00 00 00 00 00 00 00 00 00 00-`'..............
+*00/0D50:E0 27 00 00 00 00 00 00 00 00 00 00 00 00 00 00-`'..............
+*00/0D60:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00-................
+*...
+*00/0DE0:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00-................
+*00/0DF0:00-.
+*
+
                   FIN
 

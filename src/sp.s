@@ -58,13 +58,19 @@ STROBE            equ   $C010
                   org   $2000                   ; start at $2000 (all ProDOS8 system files)
                   typ   $ff
                   mx    %11
-                
-                  sep $30
+
+                  sep   $30
                   jsr   Setup80Col
                   jsr   DrawMenuBackground
 
-                  ;GOXY  #5;#15
-                  ;PRINTSTR MouseString
+                                                ;GOXY  #5;#15
+                                                ;PRINTSTR MouseString
+
+                                                ;  jsr   P8CALL_GET_PREFIX
+                                                ; lda   P8BUFF_PREFIXPATH
+                                                ; jsr   P8CALL_ONLINE
+                                                ; lda   P8BUFF_DRIVES_ONLINE
+                                                ; jsr   DirTest
 
                   clc
                   xce
@@ -255,6 +261,18 @@ MenuLoop          clc
                   bra   MenuLoop
 ******************************************************************  <<<<<<<<<<<<<<
 
+PlayerLoop        mx    %00
+                  sep   $30
+:key_loop         lda   KEY
+
+                  bpl   :key_loop
+                  sta   STROBE
+                  clc
+                  xce
+                  rep   $30
+
+                  jsr   _NTPstop
+                  rts
 
 
 * x = index to a directory entry
@@ -276,8 +294,6 @@ MenuEnterSelected mx    %00
                   jsr   SetPtr0toDirEntry
 
                   sep   $30
-
-
 :check_is_vol     lda   (0)                     ; volume "type" is denoted by drive info in high nibble of len byte
                   cmp   #$10
                   bcc   :check_is_dir
@@ -291,8 +307,8 @@ MenuEnterSelected mx    %00
                   rts
 
 :not_dir          jsr   LoadNTP
-
-                  inc   $c022
+                  jsr   StartMusic
+                  jsr   PlayerLoop
                   rts
 
 MenuActionsCount  =     7
@@ -329,32 +345,29 @@ Debug_Hex         mx    %11
 
 
 *********************************************************
-                                                ; .... TEST CODE ....
-                  lda   #$0003                  ; bank 3
-                  sta   $02                     ; dp ptr hi
-                  stz   $00                     ; dp ptr lo
-                  PT_LoadFilenameToPtr 'ntp/engine.ntp';0
-                  jsr   StartMusic
-                  FUNHALT
-                
-LoadNTP         mx %11
-    clc
-    xce
-    rep $30
-                      >>>   PT_GetPrefix            ; returns ptr in A ...
+*                                               ; .... TEST CODE ....
+*                 lda   #$0003                  ; bank 3
+*                 sta   $02                     ; dp ptr hi
+*                 stz   $00                     ; dp ptr lo
+*                 PT_LoadFilenameToPtr 'ntp/engine.ntp';0
+*                 jsr   StartMusic
+*                 FUNHALT
+
+LoadNTP           mx    %11
+                  clc
+                  xce
+                  rep   $30
+                  >>>   PT_GetPrefix            ; returns ptr in A ...
                                                 ; >>>   PT_PrintProdosStr ; "/SENSEIPLAY/" is where we start
-             lda   #$0003                  ; bank 3
+                  lda   #$0003                  ; bank 3
                   sta   $06                     ; dp ptr hi
                   stz   $04                     ; dp ptr lo
                   PT_LoadFilePtrToPtr 0;4
-                  jsr   StartMusic
-                  FUNHALT
-                  mx    %00
-                  mx    %00
+                  rts
 
-StartMusic        lda   #$0003
-                                                ;xba
-                  tay
+
+StartMusic        mx    %00
+                  ldy   #$0003
                   ldx   #0
                   jsr   _NTPprepare
                   bcc   ok
@@ -389,11 +402,7 @@ PrepareNTP        mx    %00
 :fo               inc   $c034
                   bra   :fo
 
-                                                ;  jsr   P8CALL_GET_PREFIX
-                                                ; lda   P8BUFF_PREFIXPATH
-                                                ; jsr   P8CALL_ONLINE
-                                                ; lda   P8BUFF_DRIVES_ONLINE
-                                                ; jsr   DirTest
+
                   jsr   P8Quit
 
 ******************************************
@@ -514,7 +523,7 @@ _NTPprepare       jsl   NTPprepare
                   rts
 _NTPplay          jsl   NTPplay
                   rts
-_NTPstop          jsl   _NTPstop
+_NTPstop          jsl   NTPstop
                   rts
 _NTPgetvuptr      jsl   NTPgetvuptr
                   rts
@@ -692,7 +701,7 @@ IcoDirString      asc   $1B,'XY',$18," ",$00
 IcoParentString   asc   $1B,'KI',$18," ",$00
 IcoVolString      asc   $1B,'Z^',$18," ",$00
 IcoNoString       asc   "   ",$00
-PrefixSlashStr    str   '/' 
+PrefixSlashStr    str   '/'
 
 DirListCount      dw    0
 

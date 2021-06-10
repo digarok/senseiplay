@@ -1,0 +1,3 @@
+[submodule "ninjatrackerplus"]
+	path = ninjatrackerplus
+	url = git@gitlab.apple2.gs:dbrock/ninjatrackerplus.git
