@@ -262,7 +262,7 @@ MenuLoop          clc
 ******************************************************************  <<<<<<<<<<<<<<
 
 PlayerLoop        mx    %00
-                  
+
 :key_loop         jsr   ShowTrackPos
                   jsr   ShowVUs
                   sep   $30
@@ -292,22 +292,59 @@ ShowVUs           clc
                   ldy   #2                      ; index of first track
 :vu_loop          lda   [0],y
                   jsr   RenderVU
+                  lda   [0],y
+                  jsr   RenderVUBar
+                  lda   [0],y
+                  jsr   RenderVUVals
                   iny
                   iny
                   dex
                   bne   :vu_loop
                   rts
 
-* y = vu number   a = value
+
+* y = (vu number*2)+2   a = value
+RenderVUVals      mx    %00
+
+                  phx
+                  phy
+                  sep   $30
+
+                  tya
+                  pha
+                  asl                           ; now *4
+                  clc
+                  adc   VUBarX                  ; add offset
+                  sta   8
+                  GOXY  8;#15
+                  plx
+                  dex
+                  dex
+
+                  lda   VUBarValues,x
+                  jsr   $FDDA
+
+                  clc
+                  xce
+                  rep   $30
+
+                  ply
+                  plx
+                  rts
+
+* y = (vu number*2)+2   a = value
 RenderVU          mx    %00
+
                   phx
                   phy
                   sep   $30
                   pha
                   tya
                   asl                           ; now *4
+                  clc
+                  adc   VUBarX                  ; add offset
                   sta   8
-                  GOXY  8;#15
+                  GOXY  8;#14
                   pla
                   jsr   $FDDA
 
@@ -432,20 +469,72 @@ MenuEnterSelected mx    %00
                   jsr   MenuHandlePrefixChange
                   rts
 
-:not_dir          jsr   LoadNTP
+:not_dir
+                  jsr   SaveDP
+                  jsr   LoadNTP
+                  jsr   RestoreDP
                   jsr   StartMusic
                   bcs   :err
                   jsr   PlayerUi
                   jsr   PlayerLoop
 :err
                   rts
-PlayerUi          mx    %00
+PlayerUi          mx    %00                     ; @todo: this is a mess
                   sep   $30
                   GOXY  #30;#1                  ; title pat/pos
                   PRINTSTR PatPosString
+                  GOXY  #0;#2
+
+                  lda   #NowPlayingStrs         ; now playing and clear selector
+                  ldy   #>NowPlayingStrs
+                  ldx   #00                     ; horiz pos
+                  jsr   PrintStringsX
+
+
+
                   clc
                   xce
                   rep   $30
+                  jsr   SL_GetSelected          ; print name
+                  tax
+                  jsr   SetPtr0toDirEntry
+
+                  sep   $30
+                  GOXY  #30;#5
+
+                  clc
+                  xce
+                  rep   $30
+
+                  lda   $0
+
+
+                  >>>   PT_PrintProdosStr
+
+                  jsr   _NTPgetvuptr
+
+                  stx   0
+                  sty   2
+
+:set_vu_x_offset  lda   [0]                     ; number of tracks
+                  sta VUBarCount
+                  cmp   #$4+1                   ;  set x offset based on how many tracks  (<=4), (<=8), (>8)
+                  bcs   :over_4
+:4_or_fewer       lda   #27
+                  sta   VUBarX
+                  bra   :vu_offset_complete
+:over_4           cmp   #$8+1
+                  bcs   :over_8
+:5_to_8           lda   #20
+                  sta   VUBarX
+                  bra   :vu_offset_complete
+:over_8
+                  lda   #6
+                  sta   VUBarX
+:vu_offset_complete
+
+:render_vu_boxes  jsr   RenderVUBoxes
+
                   rts
 
 MenuActionsCount  =     7
@@ -480,6 +569,28 @@ Debug_Hex         mx    %11
                   pla                           ;
                   jmp   $FDDA                   ; implied rts
 
+_DPBAK            ds    256
+SaveDP            clc
+                  xce
+                  rep   $30
+                  ldx   #$FE
+:copy             lda   $0,x
+                  sta   _DPBAK,x
+                  dex
+                  dex
+                  bpl   :copy
+                  rts
+RestoreDP         clc
+                  xce
+                  rep   $30
+                  ldx   #$FE
+:copy             lda   _DPBAK,x
+                  sta   $0,x
+                  dex
+                  dex
+                  bpl   :copy
+                  rts
+
 
 *********************************************************
 *                                               ; .... TEST CODE ....
@@ -494,9 +605,9 @@ LoadNTP           mx    %11
                   clc
                   xce
                   rep   $30
-                  >>>   PT_GetPrefix            ; returns ptr in A ...
+                                                ; >>>   PT_GetPrefix            ; returns ptr in A ...
                                                 ; >>>   PT_PrintProdosStr ; "/SENSEIPLAY/" is where we start
-                  lda   #$0003                  ; bank 3
+                  lda   #$0005                  ; bank 3
                   sta   $06                     ; dp ptr hi
                   stz   $04                     ; dp ptr lo
                   PT_LoadFilePtrToPtr 0;4
@@ -504,7 +615,7 @@ LoadNTP           mx    %11
 
 
 StartMusic        mx    %00
-                  ldy   #$0003
+                  ldy   #$0005
                   ldx   #0
                   jsr   _NTPprepare
                   bcc   :ok
@@ -734,6 +845,7 @@ FUNHALT           MAC
 
                   put   p8tools
                   put   scrollist
+                  put   vubars
                   dsk   sensei.system
 
 
@@ -862,12 +974,13 @@ DrawMenuBackground mx   %11
 
 MyString          asc   "Welcome",00
 MouseString       asc   $1B,'@ABCDEFGHIJKLMNOPQRSTUVWXYZXYXY[\]^_',$18,00
-PatPosString      asc   $1B,'_',"Pat:    ",'\'," Pos:   ",'Z',$18,00
+PatPosString      asc   $1B,'_',"Pat:    ",'C'," Pos:   ",'Z',$18,00
 IcoDirString      asc   $1B,'XY',$18," ",$00
 IcoParentString   asc   $1B,'KI',$18," ",$00
 IcoVolString      asc   $1B,'Z^',$18," ",$00
 IcoNoString       asc   "   ",$00
 PrefixSlashStr    str   '/'
+TestStr           str   'Hello all'
 
 DirListCount      dw    0
 
@@ -898,7 +1011,18 @@ TitleStrs
                   asc   $1B," ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',$18," ",00
                   hex   00,00
 
-
+NowPlayingStrs    asc   $8d,$1B,'Z',"                          Now Playing:                                       ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                       ____________________________                          ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                       ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLL',"                          ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
+                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
+                  hex   00,00
                   ds    \
 DirListMaxEntries =     256
 DirListEntrySize  =     20                      ; 16 name + 1 type + 3 len

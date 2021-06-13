@@ -295,7 +295,7 @@ _PT_AppendPrefix  mx    %00
 PT_LoadFilePtrToPtr MAC
                      mx %00
 
-                                       ldx   ]1 ; load first to prevent clobbering
+                     ldx   ]1 ; load first to prevent clobbering
                         
                      lda   ]2
                      sta   PT_DST_PTR
@@ -645,8 +645,6 @@ CloneEntryToPTDirList mx %11
                   inc   _PT_ReadDirCount
                                                 ;inc   $c034
                   rts
-
-
 
 
 
