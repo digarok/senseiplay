@@ -62,7 +62,6 @@ STROBE            equ   $C010
                   sep   $30
                   jsr   Setup80Col
                   jsr   DrawMenuBackground
-
                                                 ;GOXY  #5;#15
                                                 ;PRINTSTR MouseString
 
@@ -79,7 +78,7 @@ STROBE            equ   $C010
                   jsr   PrepareTools
                   jsr   PrepareNTP
                   >>>   PT_GetPrefix            ; returns ptr in A ...
-                                                ; >>>   PT_PrintProdosStr ; "/SENSEIPLAY/" is where we start
+                 ; >>>   PT_PrintProdosStr ; "/SENSEIPLAY/" is where we start
                   jsr   MenuRefreshDirList
                   brl   MenuLoop
 
@@ -517,7 +516,7 @@ PlayerUi          mx    %00                     ; @todo: this is a mess
                   sty   2
 
 :set_vu_x_offset  lda   [0]                     ; number of tracks
-                  sta VUBarCount
+                  sta   VUBarCount
                   cmp   #$4+1                   ;  set x offset based on how many tracks  (<=4), (<=8), (>8)
                   bcs   :over_4
 :4_or_fewer       lda   #27

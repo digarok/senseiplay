@@ -173,9 +173,10 @@ _PT_ReadOnline    mx    %00
 
                   clc
                   xce
-                  rep   #$30
+                  rep   $30
                   lda   #P8_DATA_BUFFER
                   sta   PT_TMP_PTR
+                  sep   $30
 
 :read_online_entry ldy  #0
                   lda   (PT_TMP_PTR),y
@@ -197,13 +198,15 @@ _PT_ReadOnline    mx    %00
                   clc
                   adc   #DirListEntrySize
                   sta   PT_DST_PTR
+                  rep   $30
                   inc   _PT_ReadDirCount
+                  sep   $30
                   bra   :read_online_entry
 
 :no_more_entries  rep   $30
                   lda   _PT_ReadDirCount
                   rts
-                        
+
 
 
 * Returns buffer location in A
@@ -293,16 +296,16 @@ _PT_AppendPrefix  mx    %00
 * ]1 = DP pointer to pathname
 * ]2 = DP pointer           <- points to destination
 PT_LoadFilePtrToPtr MAC
-                     mx %00
+                  mx    %00
 
-                     ldx   ]1 ; load first to prevent clobbering
-                        
-                     lda   ]2
-                     sta   PT_DST_PTR
-                     lda   ]2+2
-                     sta   PT_DST_PTR+2
+                  ldx   ]1                      ; load first to prevent clobbering
 
-                     txa    ;restore
+                  lda   ]2
+                  sta   PT_DST_PTR
+                  lda   ]2+2
+                  sta   PT_DST_PTR+2
+
+                  txa                           ;restore
 
 
                   jsr   _PT_LoadFile
@@ -545,10 +548,13 @@ _PT_ReadNextDirectoryBlock
 ** and store that to loop through the entries
 :continue         sep   #$30
                   lda   P8_DATA_BUFFER+$23
+                  beq :no_len      ; avoid zero bytes 
                   sta   _PT_DIR_ENTRY_LENGTH
+:no_len                            ; avoid zero bytes  
                   lda   P8_DATA_BUFFER+$24
+                  beq :no_ent
                   sta   _PT_DIR_ENTRIES_PER_BLOCK
-
+:no_ent
                   lda   #<P8_DATA_BUFFER+4
                   sta   PT_DIR_ENTRY_PTR
                   lda   #>P8_DATA_BUFFER+4
@@ -561,7 +567,10 @@ _PT_ReadNextDirectoryBlock
 
 
 _PT_NextEntry     dec   _PT_DIR_ENTRIES_REMAINING
+
+                  bne   :skip
                   beq   _PT_ReadNextDirectoryBlock
+:skip
                   lda   PT_DIR_ENTRY_PTR
                   clc
                   adc   _PT_DIR_ENTRY_LENGTH
@@ -576,7 +585,6 @@ _PT_NextEntry     dec   _PT_DIR_ENTRIES_REMAINING
                   cmp   #$00                    ; skip inactive entries
                   beq   _PT_NextEntry
                   jsr   CloneEntryToPTDirList
-
 
                   if    DEBUG
                   jsr   DisplayFile
@@ -610,6 +618,7 @@ DisplayFile
 
 CloneEntryToPTDirList mx %11
 
+
 :copyNameLen      ldy   #$0
                   lda   (PT_DIR_ENTRY_PTR),y    ; get storage type / filename length combination byte
                   and   #$0F                    ; trim storage type
@@ -637,12 +646,15 @@ CloneEntryToPTDirList mx %11
                   pla
                   sta   [PT_DST_PTR],y
 
-:advanceDstPtr    lda   PT_DST_PTR
+:advanceDstPtr    rep   $30
+                  lda   PT_DST_PTR
                   clc
                   adc   #DirListEntrySize       ; @todo this is defined outside of this file, redefine locally.
                   sta   PT_DST_PTR              ; doesn't cross banks (16bit) so your buffer shouldn't either
-
                   inc   _PT_ReadDirCount
+
+                  sep   $30
+
                                                 ;inc   $c034
                   rts
 
