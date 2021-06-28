@@ -124,10 +124,10 @@ _PT_PrintProdosStr mx   %00
                   ldy   #1                      ; pre-increment index past length byte
 :prloop           lda   [PT_TMP_PTR],y          ; SMC
                   ora   #%1000_0000             ; make printable char
-                  jsr   P8_COUT
+                  jsr   COOT8
                   iny
                   dex
-                  bpl   :prloop
+                  bne   :prloop
                   rep   #$30
                   rts
 
@@ -548,11 +548,11 @@ _PT_ReadNextDirectoryBlock
 ** and store that to loop through the entries
 :continue         sep   #$30
                   lda   P8_DATA_BUFFER+$23
-                  beq :no_len      ; avoid zero bytes 
+                  beq   :no_len                 ; avoid zero bytes
                   sta   _PT_DIR_ENTRY_LENGTH
-:no_len                            ; avoid zero bytes  
+:no_len                                         ; avoid zero bytes
                   lda   P8_DATA_BUFFER+$24
-                  beq :no_ent
+                  beq   :no_ent
                   sta   _PT_DIR_ENTRIES_PER_BLOCK
 :no_ent
                   lda   #<P8_DATA_BUFFER+4

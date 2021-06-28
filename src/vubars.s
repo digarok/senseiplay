@@ -14,30 +14,31 @@ VUBarCount        dw    #$04
 VUBarMaxTracks    =     #32                     ; I'm not sure of max tracks so doing 32 to be safe
 
 
-VUOffString       asc   $1B,'VW',$18,$00
-VUOnString        asc   '..',$00
+
+VUOnString       asc   'VW',$00
+VUOffString        asc   'II',$00  ; G I 
 
 VUBoxTopString    asc   " __ ",00
-VUBoxMidString    asc   $1B,'Z',$18,"  ",$1B,'_',$18,00
-VUBoxBotString    asc   " ",$1B,'LL',$18," ",00
+VUBoxMidString    asc   'Z',"  ",'_',00
+VUBoxBotString    asc   " ",'LL'," ",00
 
 * a = count
 RenderVUBoxes     mx    %00
                   sep   $30
-:prep_offset             lda   VUBarX
+:prep_offset      lda   VUBarX
                   inc                           ; offset +3 ... seems better to offset the boxes than the bars but this is hard to explain so I won't
                   inc
                   inc
                   sta   $FE                     ; ptr for goxy
 
 
-:tops                  GOXY  $FE;#VUBarY
+:tops             GOXY  $FE;#VUBarY
                   ldx   VUBarCount
 :prn_tops         PRINTSTR VUBoxTopString
                   dex
                   bne   :prn_tops
 
-]VU_Y_LINES       =     #VUBarY+1                 ; <--- LUP START
+]VU_Y_LINES       =     #VUBarY+1               ; <--- LUP START
                   LUP   4
                   GOXY  $FE;#]VU_Y_LINES
                   ldx   VUBarCount
@@ -47,7 +48,7 @@ RenderVUBoxes     mx    %00
 ]VU_Y_LINES       =     ]VU_Y_LINES             +1
                   --^                           ; <--- LUP END
 
-:bots                  GOXY  $FE;#VUBarY+5
+:bots             GOXY  $FE;#VUBarY+5
                   ldx   VUBarCount
 :prn_bots         PRINTSTR VUBoxBotString
                   dex

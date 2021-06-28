@@ -16,11 +16,6 @@
 * not at: https://prodos8.com/docs/techref/quick-reference-card/
 
 
-
-VTAB              equ   $FC22                   ; Sets the cursor vertical position (from CV)
-HOME              equ   $FC58                   ; Clears the window and puts the cursor in the upper left
-                                                ;  corner of the window
-COUT              equ   $FDED
 KEY               equ   $C000
 STROBE            equ   $C010
 
@@ -46,7 +41,6 @@ STROBE            equ   $C010
 *     - handle keys
 *
 
-
 *load mod
 * take the filename -> get filesize
 * allocate ram, contiguous  (also destroy any previous ram)
@@ -59,11 +53,15 @@ STROBE            equ   $C010
                   typ   $ff
                   mx    %11
 
-                  sep   $30
+
+
+                  jsr   InitTextTools
                   jsr   Setup80Col
                   jsr   DrawMenuBackground
-                                                ;GOXY  #5;#15
-                                                ;PRINTSTR MouseString
+                                                ;  jsr PooBug
+
+                                                ;GOXY                  #5;#15
+                                                ;PRINTSTR              MouseString
 
                                                 ;  jsr   P8CALL_GET_PREFIX
                                                 ; lda   P8BUFF_PREFIXPATH
@@ -71,15 +69,21 @@ STROBE            equ   $C010
                                                 ; lda   P8BUFF_DRIVES_ONLINE
                                                 ; jsr   DirTest
 
+
                   clc
                   xce
                   rep   #$30
 
+
+
+
                   jsr   PrepareTools
                   jsr   PrepareNTP
                   >>>   PT_GetPrefix            ; returns ptr in A ...
-                 ; >>>   PT_PrintProdosStr ; "/SENSEIPLAY/" is where we start
+
+                                                ; >>>   PT_PrintProdosStr ; "/SENSEIPLAY/" is where we start
                   jsr   MenuRefreshDirList
+
                   brl   MenuLoop
 
 MenuRefreshDirList mx   %00
@@ -126,8 +130,37 @@ MenuHandlePrefixChange mx %11
                   xce
                   rep   $30
                   lda   #PT_PREFIX_BUFFER
-                  >>>   PT_PrintProdosStr
+                  >>>   PT_PrintProdosStr       ; todo: is this needed?
 
+PooBug            mx    %11
+                  GOXY  #10;#16
+                  lda   #0
+:loop1            jsr   COOT8
+                  inc
+                  cmp   #$40
+                  bne   :loop1
+
+                  GOXY  #10;#17
+                  lda   #$40
+:loop2            jsr   COOT8
+                  inc
+                  cmp   #$80
+                  bne   :loop2
+
+                  GOXY  #10;#18
+                  lda   #$80
+:loop3            jsr   COOT8
+                  inc
+                  cmp   #$C0
+                  bne   :loop3
+
+                  GOXY  #10;#19
+                  lda   #$C0
+:loop4            jsr   COOT8
+                  inc
+
+                  bne   :loop4
+                  rts
 
 
 SelectorInit      mx    %00
@@ -155,6 +188,7 @@ DirectoryRenderItem mx  %00
                   cpx   SL_selected
                   bne   :not_selected
                   stz   2                       ; turn on char inverter
+
 :not_selected
                   jsr   SetPtr0toDirEntry       ; this calculates the pointer to our entry and stores it at $0
                   sep   #$30
@@ -188,14 +222,23 @@ DirectoryRenderItem mx  %00
                   ldy   #1                      ; start printing at byte 1
 :pr_loop          lda   (0),y
 
-                  and   #%01111111
-                  sec                           ;\___  char inverter
-                  sbc   2                       ;/
-                  jsr   COUT
+                                                ;and                   #%01111111
+                  clc                           ;\___  char inverter
+                  adc   2                       ;/
+                  cmp   #$40
+                  bcc   :okVal
+                  cmp   #$60
+                  bcs   :okVal
+                  sec
+                  sbc   #$40                    ; deal with mousetext chars
+
+
+:okVal            jsr   COOT8
                   inc   _sl_char_count
                   iny
                   dex
                   bne   :pr_loop
+
 
 :pad_out          sep   $30                     ; leave this, could be coming from above 16-bit area
                   lda   SL_windowsize_x
@@ -206,8 +249,7 @@ DirectoryRenderItem mx  %00
 
 
 :pad_space        lda   #" "
-
-                  jsr   COUT
+                  jsr   COOT8
                   dex
                   bne   :pad_space
 
@@ -219,10 +261,13 @@ _sl_char_count    dw    0                       ; used for width checking string
 MenuLoop          clc
                   xce
                   rep   #$30
+
                   jsr   SelectorInit
                                                 ;               jsr   SL_DemoList1Run
                   jsr   SL_CalculateOffset
+
                   jsr   SL_DrawWindow
+
                   sep   #$30
 
                   lda   KEY
@@ -321,7 +366,7 @@ RenderVUVals      mx    %00
                   dex
 
                   lda   VUBarValues,x
-                  jsr   $FDDA
+                  jsr   PrHex
 
                   clc
                   xce
@@ -345,7 +390,7 @@ RenderVU          mx    %00
                   sta   8
                   GOXY  8;#14
                   pla
-                  jsr   $FDDA
+                  jsr   PrHex
 
                   clc
                   xce
@@ -369,72 +414,94 @@ ShowTrackPos      clc
                   GOXY  #36;#1                  ; cursor
                   ldy   #7                      ; pat
                   lda   [0],y
-                  jsr   $FDDA
+                  jsr   PrHex
                   GOXY  #46;#1                  ; cursor
                   ldy   #8                      ; pos
                   lda   [0],y
-                  jsr   $FDDA
+                  jsr   PrHex
 
 
                   GOXY  #10;#22                 ;;; debug show track pos
                   ldy   #2
                   ldal  [0],y
-                  jsr   $FDDA
+                  jsr   PrHex
                   ldy   #3
                   ldal  [0],y
-                  jsr   $FDDA
+                  jsr   PrHex
 
                   lda   #" "
-                  jsr   $FDED
+                  jsr   COOT8
                   ldy   #4
                   ldal  [0],y
-                  jsr   $FDDA
+                  jsr   PrHex
                   ldy   #5
                   ldal  [0],y
-                  jsr   $FDDA
+                  jsr   PrHex
 
                   lda   #" "
-                  jsr   $FDED
+                  jsr   COOT8
                   ldy   #6
                   ldal  [0],y
-                  jsr   $FDDA
+                  jsr   PrHex
                   ldy   #7
                   ldal  [0],y
-                  jsr   $FDDA
+                  jsr   PrHex
 
                   lda   #" "
-                  jsr   $FDED
+                  jsr   COOT8
                   ldy   #8
                   ldal  [0],y
-                  jsr   $FDDA
+                  jsr   PrHex
                   ldy   #9
                   ldal  [0],y
-                  jsr   $FDDA
+                  jsr   PrHex
 
                   lda   #" "
-                  jsr   $FDED
+                  jsr   COOT8
                   lda   #" "
-                  jsr   $FDED
+                  jsr   COOT8
                   lda   #" "
-                  jsr   $FDED
+                  jsr   COOT8
                   ldy   #10
                   ldal  [0],y
-                  jsr   $FDDA
+                  jsr   PrHex
                   ldy   #11
                   ldal  [0],y
-                  jsr   $FDDA
+                  jsr   PrHex
 
                   lda   #" "
-                  jsr   $FDED
+                  jsr   COOT8
                   ldy   #12
                   ldal  [0],y
-                  jsr   $FDDA
+                  jsr   PrHex
                   ldy   #13
                   ldal  [0],y
-                  jsr   $FDDA
+                  jsr   PrHex
                   rts                           ; should return in 8-bit
 
 
+
+
+* a= val
+PrHex             mx    %11
+                  pha
+                  lsr
+                  lsr
+                  lsr
+                  lsr
+                  tax
+                  lda   _PrHexCaps,X
+                  jsr   COOT8
+                  pla
+                  and   #$0f
+                  tax
+                  lda   _PrHexCaps,x
+                  jsr   COOT8
+                  rts
+
+
+_PrHexCaps        asc   "0123456789ABCDEF"
+_PrHexLow         asc   "0123456789abcdef"
 
 
 * x = index to a directory entry
@@ -482,7 +549,7 @@ PlayerUi          mx    %00                     ; @todo: this is a mess
                   sep   $30
                   GOXY  #30;#1                  ; title pat/pos
                   PRINTSTR PatPosString
-                  GOXY  #0;#2
+                  GOXY  #0;#3
 
                   lda   #NowPlayingStrs         ; now playing and clear selector
                   ldy   #>NowPlayingStrs
@@ -566,7 +633,7 @@ Debug_Hex         mx    %11
                   pha                           ; hex debug
                   GOXY  #75;#22                 ;
                   pla                           ;
-                  jmp   $FDDA                   ; implied rts
+                  jmp   PrHex                   ; implied rts
 
 _DPBAK            ds    256
 SaveDP            clc
@@ -829,7 +896,7 @@ FUNHALT           MAC
                   lda   #$f6
                   sta   $c022
 :skip             lda   #$db
-;                  jsr   $fdda
+;                  jsr   PrHex
 
                   lda   $c022
                   clc
@@ -842,42 +909,14 @@ FUNHALT           MAC
                   <<<
 
 
-                  put   p8tools
-                  put   scrollist
-                  put   vubars
-                  dsk   sensei.system
 
 
-GOXY_mixed        MAC
-
-                  IF    mx/2-1                  ; LONGM
-
-                  lda   #]2+{]1*$100}           ; multiply low byte by 256 and add high byte
-                  sta   $24
-                  php
-                  sep   #$30
-
-                  jsr   VTAB
-
-
-                  plp
-                  brk   #$f0
-
-                  ELSE
-                  ldx   ]1
-                  ldy   ]2
-                  stx   $24
-                  sty   $25
-                  jsr   VTAB
-                  FIN
-                  <<<
 
 GOXY              MAC
                   ldx   ]1
                   ldy   ]2
-                  stx   $24
-                  sty   $25
-                  jsr   VTAB
+                  stx   text_h
+                  sty   text_v
                   <<<
 
 PRINTSTR          MAC
@@ -886,45 +925,22 @@ PRINTSTR          MAC
                   jsr   PrintString
                   <<<
 
-PRINTSTR_mixed    MAC
-                  IF    16_BIT                  ;  mx 00
-                  sep   #$30
-                  lda   #]1
-                  ldy   #>]1
-                  jsr   PrintString
-                  rep   #$30
 
-                  ELSE                          ; mx 11
-                  lda   #]1
-                  ldy   #>]1
-                  jsr   PrintString
-                  FIN
-                  rts
-                  <<<
-
-
-PRINTXY           MAC
-
-                  ldx   ]1
-                  ldy   ]2
-                  stx   $24
-                  sty   $25
-                  jsr   VTAB
-                  lda   #]3
-                  ldy   #>]3
-                  jsr   PrintString
-                  <<<
 
 * PrintString (A=Low Byte,  Y=High Byte)
 PrintString       mx    %11
                   sta   :loop+1
                   sty   :loop+2
 
+                  clc
+                  xce
+
                   ldy   #0
 :loop             lda   $FFFF,y                 ; dummy bytes
                   beq   :done
-                  jsr   $FDED                   ;COUT
+                  jsr   COOT8
                   iny
+
                   bra   :loop
 :done             rts
 
@@ -940,10 +956,11 @@ PrintStringsX     stx   _printstringsx_horiz
                   sta   $0
                   sty   $1
 :loop             lda   _printstringsx_horiz
-                  sta   $24
+                  sta   text_h
                   lda   $0                      ; slower, but allows API reuse
                   ldy   $1
                   jsr   PrintString             ; y is last val
+                  inc   text_v                  ; update cursor pos
                   iny
                   lda   ($0),y
                   beq   :done
@@ -965,64 +982,84 @@ Setup80Col        mx    %11
                   rts
 
 DrawMenuBackground mx   %11
-                  jsr   HOME
+
+                  jsr   text_clear              ; clear screen
+                  stz   text_h                  ; set top left corner (HOME)
+                  stz   text_v
+
                   lda   #TitleStrs
                   ldy   #>TitleStrs
                   ldx   #00                     ; horiz pos
                   jmp   PrintStringsX           ; implied rts
 
-MyString          asc   "Welcome",00
-MouseString       asc   $1B,'@ABCDEFGHIJKLMNOPQRSTUVWXYZXYXY[\]^_',$18,00
-PatPosString      asc   $1B,'_',"Pat:    ",'C'," Pos:   ",'Z',$18,00
-IcoDirString      asc   $1B,'XY',$18," ",$00
-IcoParentString   asc   $1B,'KI',$18," ",$00
-IcoVolString      asc   $1B,'Z^',$18," ",$00
-IcoNoString       asc   "   ",$00
+
 PrefixSlashStr    str   '/'
 TestStr           str   'Hello all'
 
 DirListCount      dw    0
 
+
+MouseString       asc   '@ABCDEFGHIJKLMNOPQRSTUVWXYZXYXY[\]^_',00
+PatPosString      asc   '_',"Pat:    ",'C'," Pos:   ",'Z',00
+IcoDirString      asc   'XY'," ",$00
+IcoParentString   asc   'KI'," ",$00
+IcoVolString      asc   'Z^'," ",$00
+IcoNoString       asc   "   ",$00
 TitleStrs
-                  asc   " _____________________________________________________________________________",$8D,00
-                  asc   $1B,'ZV_@ZVWVWVWV_',"SenseiPlay",'ZVWVWVWVWVWVWVWVWVWVWVWVWVWVWVWV_'," // Infinitum ",'ZWVWVWVW_',$18,,$8D,00
-                  asc   $1B,'ZLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL_',$18,$8D,00
-                  asc   $1B,'Z',"                          Choose a track:                                    ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                       ____________________________                          ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                       ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLL',"                          ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
-                  asc   $1B,'Z',"    _____                                _     ____     __                   ",'_',$18,$8D,00
-                  asc   $1B,'Z',"   / ___/  ___    ____    _____  ___    (_)   / __ \   / /  ____ _   __  __  ",'_',$18,$8D,00
-                  asc   $1B,'Z',"   \__ \  / _ \  / __ \  / ___/ / _ \  / /   / /_/ /  / /  / __ `/  / / / /  ",'_',$18,$8D,00
-                  asc   $1B,'Z',"  ___/ / /  __/ / / / / (__  ) /  __/ / /   / ____/  / /  / /_/ /  / /_/ /   ",'_',$18,$8D,00
-                  asc   $1B,'Z'," /____/  \___/ /_/ /_/ /____/  \___/ /_/   /_/      /_/   \__,_/   \__, /    ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                                                                  /____/     ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
-                  asc   $1B," ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',$18," ",00
+                  asc   " _____________________________________________________________________________",00
+                  asc   'ZV_@ZVWVWVWV_',"SenseiPlay",'ZVWVWVWVWVWVWVWVWVWVWVWVWVWVWVWV_'," // Infinitum ",'ZWVWVWVW_',00
+                  asc   'ZLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL_',00
+                  asc   'Z',"                          Choose a track:                                    ",'_',00
+                  asc   'Z',"                       ____________________________                          ",'_',00
+                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
+                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
+                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
+                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
+                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
+                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
+                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
+                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
+                  asc   'Z',"                       ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLL',"                          ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
+                  asc   'Z',"    _____                                _     ____     __                   ",'_',00
+                  asc   'Z',"   / ___/  ___    ____    _____  ___    (_)   / __ \   / /  ____ _   __  __  ",'_',00
+                  asc   'Z',"   \__ \  / _ \  / __ \  / ___/ / _ \  / /   / /_/ /  / /  / __ `/  / / / /  ",'_',00
+                  asc   'Z',"  ___/ / /  __/ / / / / (__  ) /  __/ / /   / ____/  / /  / /_/ /  / /_/ /   ",'_',00
+                  asc   'Z'," /____/  \___/ /_/ /_/ /____/  \___/ /_/   /_/      /_/   \__,_/   \__, /    ",'_',00
+                  asc   'Z',"                                                                  /____/     ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
+                  asc   " ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'," ",00
+                  hex   00,00
+NowPlayingStrs    asc   'Z',"                          Now Playing:                                       ",'_',00
+                  asc   'Z',"                       ____________________________                          ",'_',00
+                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
+                  asc   'Z',"                       ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLL',"                          ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
                   hex   00,00
 
-NowPlayingStrs    asc   $8d,$1B,'Z',"                          Now Playing:                                       ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                       ____________________________                          ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                      ",'Z',"                            ",'_',"                         ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                       ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLL',"                          ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
-                  asc   $1B,'Z',"                                                                             ",'_',$18,$8D,00
-                  hex   00,00
+
                   ds    \
 DirListMaxEntries =     256
 DirListEntrySize  =     20                      ; 16 name + 1 type + 3 len
 DirList           ds    #DirListEntrySize*DirListMaxEntries
+
+WaitKey           mx    %11
+:nope             lda   KEY
+                  bpl   :nope
+                  sta   STROBE
+                  rts
+
+
+                  put   p8tools
+                  put   texttools
+                  put   scrollist
+                  put   vubars
+                  dsk   sensei.system
+

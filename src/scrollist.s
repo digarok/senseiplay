@@ -1,12 +1,17 @@
+* scrollist - take a list of items and allow you to draw it in a window
+* at any position and with an item selected.
+
+
                   mx    %00
-* if selected is over half the value of the window heigh then offset becones selected minus window heigght /2
+
+
+* scroll-center algorithm
+* if selected is over half the value of the window height then offset becomes selected minus window height /2
 * if at the end, the offfset is greater than list size minus window height then offset = list size minus window height (stop scrolling)
 
-*scrollist
 
 
 * setup
-
 * -- draw list
 *     init window ranges?
 *      for i in range(start,finish):
@@ -102,10 +107,9 @@ SL_DrawWindow     mx    %00
                   sty   SL_cur_y
 
 :set_xy           ldx   SL_windowpos_x
-                  stx   $24
+                  stx   text_h
                   ldy   SL_cur_y
-                  sty   $25
-                  jsr   VTAB
+                  sty   text_v
                   clc
                   xce
                   rep   #$30
@@ -175,7 +179,7 @@ SL_DemoList1RenderItem mx %00
 :pr_loop          lda   (0),y
                   sec                           ;\___  char inverter
                   sbc   2                       ;/
-                  jsr   COUT
+                  jsr   COOT8
                   iny
                   dex
                   bne   :pr_loop
