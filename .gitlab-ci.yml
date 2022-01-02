@@ -1,0 +1,15 @@
+stages:          # List of stages for jobs, and their order of execution
+  - build
+
+build-job:       # This job runs in the build stage, which runs first.
+  stage: build
+  script:
+    - echo "SENSEIPLAY BUILD STAGE"
+    - wget -O /tmp/merlin.zip https://github.com/digarok/merlin32/releases/download/v1.1.10/merlin32-ubuntu-latest-v1.1.10.zip
+    - unzip -o /tmp/merlin.zip -d /tmp
+    - ls -al /tmp
+    - wget -O /tmp/cadius.zip https://github.com/digarok/cadius/releases/download/0.0.0/cadius-ubuntu-latest-0.0.0.zip
+    - unzip -o /tmp/cadius.zip -d /tmp
+    - ls -al /tmp
+
+
