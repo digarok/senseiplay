@@ -14,6 +14,7 @@ setup-tools:       # This job runs in the build stage, which runs first.
     - tar -xzf /tmp/appy.tar.gz --directory /tmp
     - ls -al /tmp
     - mv /tmp/merlin32 /tmp/cadius /tmp/appy /usr/local/bin/
+    - ls -al /usr/local/bin
     - appy
     - merlin32
     - cadius
