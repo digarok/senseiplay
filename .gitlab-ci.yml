@@ -10,6 +10,12 @@ build-job:       # This job runs in the build stage, which runs first.
     - ls -al /tmp
     - wget -O /tmp/cadius.zip https://github.com/digarok/cadius/releases/download/0.0.0/cadius-ubuntu-latest-0.0.0.zip
     - unzip -o /tmp/cadius.zip -d /tmp
-    - ls -al /tmp
+    - wget -O /tmp/appy.tar.gz https://github.com/digarok/Appy/releases/download/v0.0.0/Appy_0.0.0_Linux_64bit.tar.gz
+    - tar -xzf /tmp/appy.tar.gz --directory /tmp
+    - mv /tmp/Appy /usr/local/bin/appy
+    - appy
+    - cadius
+    - merlin32
+
 
 
