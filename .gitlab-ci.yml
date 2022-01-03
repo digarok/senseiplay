@@ -15,8 +15,8 @@ setup-tools:       # This job runs in the build stage, which runs first.
     - ls -al /tmp
     - mv /tmp/merlin32 /tmp/cadius /tmp/appy /usr/local/bin/
     - appy
-    - cadius
     - merlin32
+    - cadius
 build-job:
   stage: build
   script:
