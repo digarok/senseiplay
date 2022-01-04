@@ -15,13 +15,15 @@ setup-tools:       # This job runs in the build stage, which runs first.
     - ls -al /tmp
     - mv /tmp/merlin32 /tmp/cadius /tmp/appy /usr/local/bin/
     - ls -al /usr/local/bin
-    - appy
-    - merlin32
-    - cadius
+      #- appy
+      #- merlin32 -h
+      #- cadius
 build-job:
   stage: build
   script:
     - echo "SENSEIPLAY BUILD STAGE"
+    - mv appy.user.yaml.gitlab appy.user.yaml
+    - appy
 
 
 
