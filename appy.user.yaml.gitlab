@@ -1,0 +1,4 @@
+# settings for building under gitlab w/ docker
+programs:
+  merlin32: '/usr/local/bin/merlin32'
+  cadius: '/usr/local/bin/cadius'
