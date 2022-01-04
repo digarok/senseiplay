@@ -23,7 +23,7 @@ build-job:
     - mv /tmp/merlin32 /tmp/cadius /tmp/appy /usr/local/bin/
     - ls -al /usr/local/bin
     - mv appy.user.yaml.gitlab appy.user.yaml
-    - apk add --no-cache git ssh
+    - apk add --no-cache git openssh
     - git submodule init
     - git submodule update
     - appy build
