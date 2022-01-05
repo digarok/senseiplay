@@ -7,7 +7,7 @@ build-job:
       GIT_SUBMODULE_STRATEGY: normal
       #before_script:
     #- apk add --update curl && rm -rf /var/cache/apk/*
-    -  apt-get install -y wget
+    - apt-get install -y wget
   script:
     - echo "SENSEIPLAY BUILD STAGE"
     - uptime
