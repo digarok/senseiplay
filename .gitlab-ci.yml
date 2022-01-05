@@ -8,7 +8,7 @@ build-job:
   before_script:
     #- apk add --update curl && rm -rf /var/cache/apk/*
     - apt update
-    - apt-get install -y wget unzip
+    - apt-get install -y wget unzip python3
     - wget -O /tmp/p8.dsk http://mirrors.apple2.org.za/ftp.apple.asimov.net/images/masters/prodos/ProDOS_2_4_2.dsk
     - wget https://raw.githubusercontent.com/digarok/dsk2po/master/dsk2po.py
     - python3 dsk2po.py /tmp/p8.dsk
