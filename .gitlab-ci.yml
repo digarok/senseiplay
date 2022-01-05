@@ -7,7 +7,7 @@ build-job:
       GIT_SUBMODULE_STRATEGY: normal
   before_script:
     #- apk add --update curl && rm -rf /var/cache/apk/*
-    - apk add --no-cache git openssh 
+    - apk add --no-cache git openssh wget
   script:
     - echo "SENSEIPLAY BUILD STAGE"
     - uptime
