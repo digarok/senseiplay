@@ -9,18 +9,21 @@ build-job:
     #- apk add --update curl && rm -rf /var/cache/apk/*
     - apt update
     - apt-get install -y wget unzip
-  script:
-    - echo "SENSEIPLAY BUILD STAGE"
-    - uptime
+    - wget -O /tmp/p8.dsk  wget http://mirrors.apple2.org.za/ftp.apple.asimov.net/images/masters/prodos/ProDOS_2_4_2.dsk
+    - wget  wget https://raw.githubusercontent.com/digarok/dsk2po/master/dsk2po.py
+    - python3 dsk2po.py /tmp/p8.dsk
+    - ls -al /tmp
     - wget -O /tmp/merlin.zip https://github.com/digarok/merlin32/releases/download/v1.1.10/merlin32-ubuntu-latest-v1.1.10.zip
     - unzip -o /tmp/merlin.zip -d /tmp 
     - wget -O /tmp/cadius.zip https://github.com/digarok/cadius/releases/download/0.0.0/cadius-ubuntu-latest-0.0.0.zip
     - unzip -o /tmp/cadius.zip -d /tmp
     - wget -O /tmp/appy.tar.gz https://github.com/digarok/Appy/releases/download/v0.0.0/appy_0.0.0_Linux_64bit.tar.gz
     - tar -xzf /tmp/appy.tar.gz --directory /tmp
-    - ls -al /tmp
     - mv /tmp/merlin32 /tmp/cadius /tmp/appy /usr/local/bin/
-    - ls -al /usr/local/bin
+    - cadius extractvolume /tmp/p8.po 
+  script:
+    - echo "SENSEIPLAY BUILD STAGE"
+    - uptime
     - mv appy.user.yaml.gitlab appy.user.yaml
       #    - apk add --no-cache git openssh
       #    - git submodule init
