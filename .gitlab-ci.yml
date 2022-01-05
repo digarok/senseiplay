@@ -8,7 +8,7 @@ build-job:
   before_script:
     #- apk add --update curl && rm -rf /var/cache/apk/*
     - apt update
-    - apt-get install -y wget
+    - apt-get install -y wget unzip
   script:
     - echo "SENSEIPLAY BUILD STAGE"
     - uptime
