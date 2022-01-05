@@ -4,8 +4,8 @@ stages:          # List of stages for jobs, and their order of execution
 build-job:
   stage: build
   variables:
-      GIT_SUBMODULE_STRATEGY: normal
-      #before_script:
+    GIT_SUBMODULE_STRATEGY: normal
+  before_script:
     #- apk add --update curl && rm -rf /var/cache/apk/*
     - apt-get install -y wget
   script:
