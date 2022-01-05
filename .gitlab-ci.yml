@@ -11,7 +11,7 @@ build-job:
     - apt-get install -y wget unzip python3
     - wget -O /tmp/p8.dsk http://mirrors.apple2.org.za/ftp.apple.asimov.net/images/masters/prodos/ProDOS_2_4_2.dsk
     - wget https://raw.githubusercontent.com/digarok/dsk2po/master/dsk2po.py
-    - python3 dsk2po.py /tmp/p8.dsk
+    - python3 dsk2po.py /tmp/p8.dsk || true
     - ls -al /tmp
     - wget -O /tmp/merlin.zip https://github.com/digarok/merlin32/releases/download/v1.1.10/merlin32-ubuntu-latest-v1.1.10.zip
     - unzip -o /tmp/merlin.zip -d /tmp 
