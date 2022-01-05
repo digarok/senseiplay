@@ -20,7 +20,7 @@ build-job:
     - wget -O /tmp/appy.tar.gz https://github.com/digarok/Appy/releases/download/v0.0.0/appy_0.0.0_Linux_64bit.tar.gz
     - tar -xzf /tmp/appy.tar.gz --directory /tmp
     - mv /tmp/merlin32 /tmp/cadius /tmp/appy /usr/local/bin/
-    - cadius extractvolume /tmp/p8.po 
+    - cadius extractvolume /tmp/p8.po ..
   script:
     - echo "SENSEIPLAY BUILD STAGE"
     - uptime
