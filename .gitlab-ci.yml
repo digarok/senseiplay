@@ -11,6 +11,8 @@ stages:          # List of stages for jobs, and their order of execution
       #- cadius
 build-job:
   stage: build
+  variables:
+      GIT_SUBMODULE_STRATEGY: normal
   script:
     - echo "SENSEIPLAY BUILD STAGE"
     - wget -O /tmp/merlin.zip https://github.com/digarok/merlin32/releases/download/v1.1.10/merlin32-ubuntu-latest-v1.1.10.zip
