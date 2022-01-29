@@ -10,9 +10,9 @@ disks:
     output: /senseiplay/src
   - input: ninjatrackerplus/ntpplayer
     output: /senseiplay
-  - input: ../modsearch/potential/eclipse.ntp
-    output: /senseiplay
-    ftaux: #B30000
+  #- input: ../modsearch/potential/eclipse.ntp
+  #  output: /senseiplay
+  #  ftaux: #B30000
   - input: src/sensei.system
     output: /senseiplay
   - input: content/NHFbyNFCv03.ntp
@@ -20,7 +20,7 @@ disks:
   - input: content/dotland.ntp
     output: /senseiplay/ntp
   - input: content/eshaa.ntp
-    output: /senseiplay/ntp
+    output: /senseiplay
   - input: content/exquisite.ntp
     output: /senseiplay/ntp
   - input: content/dr4.ntp
@@ -31,6 +31,3 @@ disks:
     output: /senseiplay/ntp
   - input: content/engine.ntp
     output: /senseiplay/ntp
-
-
-    

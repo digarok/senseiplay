@@ -7,7 +7,7 @@
 *  /____/  \___/ /_/ /_/ /____/  \___/ /_/   /_/      /_/   \__,_/   \__, /    *
 *                                                                   /____/     *
 *                                                                              *
-*  (c) 2021 Dagen Brock                                                        *
+*  (c) 2021-2022 Digarok                                                       *
 *  NinjaTrackerPlus (NTP) Engine by Jesse Blue of Ninjaforce                   *
 ********************************************************************************
 
@@ -18,6 +18,10 @@
 
 KEY               equ   $C000
 STROBE            equ   $C010
+
+* update positions:  do the ascii, SL_SETWINDOWPOS stuff,
+
+
 
 ****
 *   PrepareTools
@@ -47,44 +51,39 @@ STROBE            equ   $C010
 
 
 
-
-
                   org   $2000                   ; start at $2000 (all ProDOS8 system files)
                   typ   $ff
                   mx    %11
 
-
-
+*    jsr HEX24TODEC8
+*    jsr DEC8TOCHAR10R   
+*    lda CHAR10
                   jsr   InitTextTools
                   jsr   Setup80Col
+                  
+                  jsr   TextColorSet
                   jsr   DrawMenuBackground
-                                                ;  jsr PooBug
+                  jsr   DrawNinjaAnimIn
 
-                                                ;GOXY                  #5;#15
-                                                ;PRINTSTR              MouseString
+                           
 
                                                 ;  jsr   P8CALL_GET_PREFIX
                                                 ; lda   P8BUFF_PREFIXPATH
                                                 ; jsr   P8CALL_ONLINE
                                                 ; lda   P8BUFF_DRIVES_ONLINE
                                                 ; jsr   DirTest
-
-
                   clc
                   xce
                   rep   #$30
 
 
-
-
                   jsr   PrepareTools
                   jsr   PrepareNTP
                   >>>   PT_GetPrefix            ; returns ptr in A ...
-
                                                 ; >>>   PT_PrintProdosStr ; "/SENSEIPLAY/" is where we start
                   jsr   MenuRefreshDirList
-
                   brl   MenuLoop
+
 
 MenuRefreshDirList mx   %00
                   stz   SL_selected             ; always zero
@@ -92,6 +91,7 @@ MenuRefreshDirList mx   %00
                   >>>   PT_ReadDir              ; returns count in A
                   sta   DirListCount
                   rts
+
 
 MenuRefreshDirListOnline mx %00
                   stz   SL_selected             ; always zero
@@ -132,52 +132,23 @@ MenuHandlePrefixChange mx %11
                   lda   #PT_PREFIX_BUFFER
                   >>>   PT_PrintProdosStr       ; todo: is this needed?
 
-PooBug            mx    %11
-                  GOXY  #10;#16
-                  lda   #0
-:loop1            jsr   COOT8
-                  inc
-                  cmp   #$40
-                  bne   :loop1
-
-                  GOXY  #10;#17
-                  lda   #$40
-:loop2            jsr   COOT8
-                  inc
-                  cmp   #$80
-                  bne   :loop2
-
-                  GOXY  #10;#18
-                  lda   #$80
-:loop3            jsr   COOT8
-                  inc
-                  cmp   #$C0
-                  bne   :loop3
-
-                  GOXY  #10;#19
-                  lda   #$C0
-:loop4            jsr   COOT8
-                  inc
-
-                  bne   :loop4
-                  rts
-
 
 SelectorInit      mx    %00
-:setup            SL_SETWINDOWPOS 25;5
-                  SL_SETWINDOWSIZE 22;8
+:setup            SL_SETWINDOWPOS 31;11
+                  SL_SETWINDOWSIZE 32;8         
                   SL_SETRENDERFUNCTION DirectoryRenderItem
                   lda   DirListCount
                   sta   SL_itemscount
                   rts
 
+
 * assume cursor xy is set for string printing
 * a = item index   -  uses 0 and 2 on dp
-
 DirectoryRenderItem mx  %00
                   ldx   #$80
                   stx   2                       ; don't change chars
                   stz   _sl_char_count          ; zero char counter
+                  stz   _sl_show_size           ; turn off filesize printing
                   cmp   SL_itemscount           ; see if item exists
                   bcc   :exists
                   bra   :pad_out                ; otherwise just pad out the line
@@ -213,9 +184,10 @@ DirectoryRenderItem mx  %00
                   bra   :continue2
 :normal_dir       PRINTSTR IcoDirString
                   bra   :continue2
-:not_dir
-                  PRINTSTR IcoNoString
-:continue2
+:not_dir          PRINTSTR IcoNoString
+                  dec  _sl_show_size            ; turn on filesize printing
+:continue2        lda #4                        ;\_ inc the character count since we printed...
+                  sta _sl_char_count            ;/    this could be optimized out but I'm leaving it for flexibility.
                   lda   (0)                     ; get len byte
                   and   #$0F
                   tax                           ;  .. counter
@@ -237,51 +209,107 @@ DirectoryRenderItem mx  %00
                   inc   _sl_char_count
                   iny
                   dex
-                  bne   :pr_loop
-
+                  bne   :pr_loop  
 
 :pad_out          sep   $30                     ; leave this, could be coming from above 16-bit area
                   lda   SL_windowsize_x
-
                   sec
-                  sbc   _sl_char_count
-                  tax
+                  sbc   _sl_char_count          ; win_x - printed chars = pad amount
+                  ldx _sl_show_size             ; check if we are printing 10 char size string too
+                  beq :no_size_pad
+                  sbc   #10
 
+:no_size_pad      tax                          
 
 :pad_space        lda   #" "
                   jsr   COOT8
                   dex
                   bne   :pad_space
 
+:size_test        lda _sl_show_size
+                  beq :done
+                
+                  ldy #17 ; size offset (3-byte)
+                  lda (0),Y
+                  sta HEX24   ; set conversion bytes
+                  iny
+                  lda (0),Y
+                  sta HEX24+1 
+                  iny
+                  lda (0),Y
+                  sta HEX24+2
+
+                  jsr HEX24TODEC8
+                  jsr DEC8TOCHAR10R
+                  ldx #0
+:loop             lda CHAR10,x
+                  jsr COOT8
+                  inx
+                  cpx #10
+                  bne :loop
+:done             rep $30
+                  rts
+
+
+                    ldy #19
+                    lda (0),Y
+                    sta HEX24+2 ; set for conv
+            ;       jsr PrHex 
+                    ldy #18
+                    lda (0),Y
+                    sta HEX24+1 ; set for conv
+             ;      jsr PrHex 
+                    ldy #17
+                    lda (0),Y
+                    sta HEX24+0 ; set for conv
+           ;        jsr PrHex 
+
+                   jsr HEX24TODEC8
+                   jsr DEC8TOCHAR10R
+              lda #" " 
+              jsr COOT8
+    
+
+*    jsr HEX24TODEC8
+*    jsr DEC8TOCHAR10R   
+*    lda CHAR10
+
+
                   rep   #$30
                   rts
 _sl_char_count    dw    0                       ; used for width checking strings
+_sl_show_size     dw 0
+
+
+
+
+
 
 ******************************************************************  <<<<<<<<<<<<<<
 MenuLoop          clc
                   xce
                   rep   #$30
 
-                  jsr   SelectorInit
+                  jsr   SelectorInit            ; not expensive so just leave it here
                                                 ;               jsr   SL_DemoList1Run
                   jsr   SL_CalculateOffset
-
                   jsr   SL_DrawWindow
 
+:key_handling
                   sep   #$30
 
                   lda   KEY
                   bpl   MenuLoop
                   sta   STROBE
 
-                  lda   KEY
-                  ldx   #0                      ; counter
-:find_key         cmp   MenuActions,x
+                  lda   KEY                     
+                  ldx   #0                      ; index/counter
+:find_key         cmp   MenuActions,x           ; go through all the keys we know about
                   beq   :found_key
                   inx
                   cpx   #MenuActionsCount
                   bne   :find_key
-                  bra   :not_down
+                  bra   :debug
 
 :found_key        rep   $30
                   txa
@@ -292,18 +320,19 @@ MenuLoop          clc
                   sta   :jump+1
 
 
-:jump             jsr   $0000
-
+:jump             jsr   $0000                   ; SMC
                   bra   MenuLoop
-:not_down         sep   #$30
 
-:debug            jsr   Debug_Hex               ;
-                  clc
-                  xce
-
-:no_key           rep   #$30
+:debug            sep   #$30                    ;
+                  pha                           ; hex debug
+                  GOXY  #75;#22                 ;
+                  pla                           ;
+                  jsr   PrHex                   
+              
                   bra   MenuLoop
 ******************************************************************  <<<<<<<<<<<<<<
+
+
 
 PlayerLoop        mx    %00
 
@@ -315,6 +344,7 @@ PlayerLoop        mx    %00
                   sta   STROBE
 
 :cleanup          jsr   DrawMenuBackground
+                  jsr   DrawNinjaAnimIn
 
                   clc
                   xce
@@ -360,7 +390,7 @@ RenderVUVals      mx    %00
                   clc
                   adc   VUBarX                  ; add offset
                   sta   8
-                  GOXY  8;#15
+                  GOXY  8;VUBarY+7
                   plx
                   dex
                   dex
@@ -388,7 +418,8 @@ RenderVU          mx    %00
                   clc
                   adc   VUBarX                  ; add offset
                   sta   8
-                  GOXY  8;#14
+                  GOXY  8;VUBarY+6
+
                   pla
                   jsr   PrHex
 
@@ -421,7 +452,7 @@ ShowTrackPos      clc
                   jsr   PrHex
 
 
-                  GOXY  #10;#22                 ;;; debug show track pos
+                  GOXY  #22;#22                 ;;; debug show track pos
                   ldy   #2
                   ldal  [0],y
                   jsr   PrHex
@@ -482,28 +513,6 @@ ShowTrackPos      clc
 
 
 
-* a= val
-PrHex             mx    %11
-                  pha
-                  lsr
-                  lsr
-                  lsr
-                  lsr
-                  tax
-                  lda   _PrHexCaps,X
-                  jsr   COOT8
-                  pla
-                  and   #$0f
-                  tax
-                  lda   _PrHexCaps,x
-                  jsr   COOT8
-                  rts
-
-
-_PrHexCaps        asc   "0123456789ABCDEF"
-_PrHexLow         asc   "0123456789abcdef"
-
-
 * x = index to a directory entry
 SetPtr0toDirEntry mx    %00
                   lda   #DirList                ; start w pointer at beginning of list
@@ -535,7 +544,8 @@ MenuEnterSelected mx    %00
                   jsr   MenuHandlePrefixChange
                   rts
 
-:not_dir
+:not_dir                                        ; Let's load our song if we can
+                  jsr   DrawNinjaLoadEyes
                   jsr   SaveDP
                   jsr   LoadNTP
                   jsr   RestoreDP
@@ -547,16 +557,14 @@ MenuEnterSelected mx    %00
                   rts
 PlayerUi          mx    %00                     ; @todo: this is a mess
                   sep   $30
-                  GOXY  #30;#1                  ; title pat/pos
+                  GOXY  #30;#1                  ; title pat/pos (in title bar)
                   PRINTSTR PatPosString
-                  GOXY  #0;#3
 
-                  lda   #NowPlayingStrs         ; now playing and clear selector
+                  GOXY  #0;VUBarY-4
+                  lda   #NowPlayingStrs         ; now playing and clear file widget
                   ldy   #>NowPlayingStrs
                   ldx   #00                     ; horiz pos
                   jsr   PrintStringsX
-
-
 
                   clc
                   xce
@@ -566,14 +574,13 @@ PlayerUi          mx    %00                     ; @todo: this is a mess
                   jsr   SetPtr0toDirEntry
 
                   sep   $30
-                  GOXY  #30;#5
+                  GOXY  #30;VUBarY-2
 
                   clc
                   xce
                   rep   $30
 
                   lda   $0
-
 
                   >>>   PT_PrintProdosStr
 
@@ -627,13 +634,6 @@ MenuRoutines      da    SL_DecSelected
 
 
 
-
-* 8-bit with value in a plz
-Debug_Hex         mx    %11
-                  pha                           ; hex debug
-                  GOXY  #75;#22                 ;
-                  pla                           ;
-                  jmp   PrHex                   ; implied rts
 
 _DPBAK            ds    256
 SaveDP            clc
@@ -718,6 +718,13 @@ HoldUp            mx    %00
                   sta   $c034
                   rts
 
+                  mx %11
+WaitVBL           
+:wait_vbl_start   lda   $c019
+                  bpl   :wait_vbl_start
+:wait_vbl_end     lda   $c019
+                  bmi   :wait_vbl_end
+                  rts
 
 PrepareNTP        mx    %00
                   jsr   AllocOneBank
@@ -757,16 +764,13 @@ PrepareTools      stz   MasterId                ; I haven't created a new user I
                   _MMStartUp
                   pla
                   bcc   MM_OK
-* If the Memory Manager reported an error, we need to allocate our own memory first.
-                  _MTStartUp
-* First we need a user ID.
-                  pha
+                  _MTStartUp                    ; If the Memory Manager reported an error, we need to allocate our own memory first.
+                  pha                           ; First we need a user ID.
                   pea   $1000
                   _GetMasterId                  ; Get me a new user ID (Application)
                   pla
                   sta   MasterId                ; Save it for later
-* Now give us all of bank zero and bank one.
-                  pha
+                  pha                           ; Now give us all of bank zero and bank one.
                   pha                           ; Result space
                   pea   $0000
                   pea   $B800                   ; Block size
@@ -975,6 +979,39 @@ PrintStringsX     stx   _printstringsx_horiz
 :done             rts
 
 _printstringsx_horiz db 00
+_printstringsy_clip db 00
+* lda #MainMenuStrs
+* ldy #>MainMenuStrs
+* ldx #05 ; horiz pos
+SetYClip          sta _printstringsy_clip
+                  rts
+PrintStringsXYClip     stx   _printstringsx_horiz
+                  sta   $0
+                  sty   $1
+                  stz   $12                    ; y clip
+:loop             
+                  lda   $12 
+                  cmp   _printstringsy_clip
+                  beq   :done
+                  lda   _printstringsx_horiz
+                  sta   text_h
+                  lda   $0                      ; slower, but allows API reuse
+                  ldy   $1
+                  jsr   PrintString             ; y is last val
+                  inc   text_v                  ; update cursor pos
+                  inc   $12                      ; update y clip
+                  iny
+                  lda   ($0),y
+                  beq   :done
+                  tya                           ; not done so add strlen to source ptr
+                  clc
+                  adc   $0
+                  sta   $0
+                  bcc   :nocarry
+                  inc   $1
+:nocarry          bra   :loop
+
+:done             rts
 
 Setup80Col        mx    %11
                   lda   #$A0                    ;USE A BLANK SPACE TO
@@ -991,6 +1028,62 @@ DrawMenuBackground mx   %11
                   ldy   #>TitleStrs
                   ldx   #00                     ; horiz pos
                   jmp   PrintStringsX           ; implied rts
+
+DrawNinjaLoadEyes mx    %11
+                  GOXY  #15;#15
+                  PRINTSTR NinjaAppleEyesClose
+                  rts
+
+DrawNinjaAnimIn   mx %11
+                  lda   #23             ; start position Y
+                  sta   _dnai_y
+                  stz   _dnai_y_clip    ; 0 lines
+                  lda   #15             ; ninja height
+                  sta   _dnai_y_clip_max
+
+:loop             jsr   WaitVBL
+
+                  ldx   #3
+                  ldy   _dnai_y
+                  lda   _dnai_y_clip
+                  jsr   DrawNinjaXYClip
+                
+                  jsr   WaitVBL
+                  dec   _dnai_y         ; next pass start higher
+                  inc   _dnai_y_clip
+                  lda   _dnai_y_clip
+                  cmp   _dnai_y_clip_max
+                  beq   :done
+                  bra :loop
+:done             rts 
+_dnai_y          db 0   ; y start
+_dnai_y_clip     db 0   ; current value
+_dnai_y_clip_max db 0   ; done value
+
+
+                  
+TextColorSet      mx %11
+                  lda $c034
+                  sta _bak_bordercolor
+                  lda $c022
+                  sta _bak_textcolor
+                  lda #0
+                  sta $c034
+                  lda #$C0 ; grn black
+                  sta $c022
+                  rts
+
+TextColorRestore  mx %11          
+                  lda _bak_bordercolor
+                  sta $c022
+                  lda _bak_textcolor
+                  sta $c034
+                  rts
+                  
+_bak_bordercolor ds 1
+_bak_textcolor ds 1
+
+
 
 
 PrefixSlashStr    str   '/'
@@ -1009,32 +1102,63 @@ TitleStrs
                   asc   " _____________________________________________________________________________",00
                   asc   'ZV_@ZVWVWVWV_',"SenseiPlay",'ZVWVWVWVWVWVWVWVWVWVWVWVWVWVWVWV_'," // Infinitum ",'ZWVWVWVW_',00
                   asc   'ZLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL_',00
-                  asc   'Z',"                          Choose a track:                                    ",'_',00
-                  asc   'Z',"                       ____________________________                          ",'_',00
-                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
-                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
-                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
-                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
-                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
-                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
-                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
-                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
-                  asc   'Z',"                       ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLL',"                          ",'_',00
-                  asc   'Z',"                                                                             ",'_',00
-                  asc   'Z',"                                                                             ",'_',00
                   asc   'Z',"    _____                                _     ____     __                   ",'_',00
                   asc   'Z',"   / ___/  ___    ____    _____  ___    (_)   / __ \   / /  ____ _   __  __  ",'_',00
                   asc   'Z',"   \__ \  / _ \  / __ \  / ___/ / _ \  / /   / /_/ /  / /  / __ `/  / / / /  ",'_',00
                   asc   'Z',"  ___/ / /  __/ / / / / (__  ) /  __/ / /   / ____/  / /  / /_/ /  / /_/ /   ",'_',00
                   asc   'Z'," /____/  \___/ /_/ /_/ /____/  \___/ /_/   /_/      /_/   \__,_/   \__, /    ",'_',00
                   asc   'Z',"                                                                  /____/     ",'_',00
+                  asc   'Z',"                              Choose a track:                                ",'_',00
+                  asc   'Z',"                             _________________________________               ",'_',00
+                  asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
+                  asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
+                  asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
+                  asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
+                  asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
+                  asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
+                  asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
+                  asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
+                  asc   'Z',"                             ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',"               ",'_',00
                   asc   'Z',"                                                                             ",'_',00
-                  asc   " ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'," ",00
+                  asc   'Z',"                                                                             ",'_',00
+
+                  asc   'Z',"                                                                             ",'_',00
+                  asc   " ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'," ",00        
                   hex   00,00
+
+NinjaStrs         asc   "                        ",00
+                  asc   "           ______       ",00
+                  asc   "         .'      `.     ",00
+                  asc   "   /.   /          \    ",00
+                  asc   "   `.`.:            :   ",00
+                  asc   "   _.:'|   ,--------|   ",00
+                  asc   "   `-./|  | ",'[',"     ",'['," :   ",00
+                  asc   "       :  \_.---^-._|   ",00
+                  asc   "    __  \           ;   ",00
+                  asc   " .",'SL',"\_\  :         /    ",00
+                  asc   "     \_\ :  ` . _.`     ",00
+                  asc   "      \ (        :      ",00
+                  asc   " __.---``         `--._ ",00
+                  asc   "/                      \",00
+                  hex   00,00,00,00,00,00   ; not needed
+NinjaAppleEyesClose asc '@',"     ",'@',00
+                 mx %11
+; x = x, y=y, clip = ylines to draw before stopping
+DrawNinjaXYClip   jsr SetYClip ; with A value
+                  sty text_v                                  ; works
+                  lda #NinjaStrs
+                  ldy #>NinjaStrs
+                  jsr PrintStringsXYClip
+                  rts
+
+
 NowPlayingStrs    asc   'Z',"                          Now Playing:                                       ",'_',00
                   asc   'Z',"                       ____________________________                          ",'_',00
                   asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
                   asc   'Z',"                       ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLL',"                          ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
                   asc   'Z',"                                                                             ",'_',00
                   asc   'Z',"                                                                             ",'_',00
                   asc   'Z',"                                                                             ",'_',00
@@ -1049,7 +1173,8 @@ NowPlayingStrs    asc   'Z',"                          Now Playing:             
 DirListMaxEntries =     256
 DirListEntrySize  =     20                      ; 16 name + 1 type + 3 len
 DirList           ds    #DirListEntrySize*DirListMaxEntries
-
+WaitKeyColor      mx %11
+                  inc $c034
 WaitKey           mx    %11
 :nope             lda   KEY
                   bpl   :nope
@@ -1062,4 +1187,3 @@ WaitKey           mx    %11
                   put   scrollist
                   put   vubars
                   dsk   sensei.system
-

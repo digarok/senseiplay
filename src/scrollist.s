@@ -1,28 +1,29 @@
-* scrollist - take a list of items and allow you to draw it in a window
-* at any position and with an item selected.
-
+**************************************************************************
+** scrollist library - implement a scrolling selection list in a window **
+**************************************************************************
 
                   mx    %00
 
 
-* scroll-center algorithm
-* if selected is over half the value of the window height then offset becomes selected minus window height /2
-* if at the end, the offfset is greater than list size minus window height then offset = list size minus window height (stop scrolling)
+** scroll-center algorithm
+** - if selected item is over half the value of the window height then offset becomes selected minus window height /2
+** - if at the end, the offfset is greater than list size minus window height then offset = list size minus window height (stop scrolling)
+
+** init example - set window and list properties
+** 
+**                  SL_SETWINDOWPOS 31;11               ; set position
+**                  SL_SETWINDOWSIZE 22;8               ; set size
+**                  SL_SETRENDERFUNCTION MyItemRender   ; set item renderer function
+**                  lda   MyListCount                   ;\_ set number of items
+**                  sta   SL_itemscount                 ;/
 
 
-
-* setup
-* -- draw list
-*     init window ranges?
-*      for i in range(start,finish):
-*        dispatch_draw_function(i)
-
-* -- handle keys
-*     if up selected--
-*       if selected <0 selected = 0
-*     if dn selected++
-*       if selected > itemscount selected = itemscount
-*     if enter return index?  or trigger list "execution" routine
+** handle keys
+**     if up selected--
+**       if selected <0 selected = 0
+**     if dn selected++
+**       if selected > itemscount selected = itemscount
+**     if enter return index?  or trigger list "execution" routine
 
 
 SL_SETWINDOWSIZE  MAC

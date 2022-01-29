@@ -1,14 +1,10 @@
-
-
-
-
 VUBarDecay        db    #$4                     ; how much time between stepdown.. can change if needed
 VUBarDecayValue   db    #$1                     ; how much to decay between stepdown.. can change if needed
 
 VUBarValues       ds    #VUBarMaxTracks*2
 VUBarDecays       ds    #VUBarMaxTracks*2
 VUBarX            dw    #$0004
-VUBarY            =     #$08
+VUBarY            =     #13
 VUBarSpacing      db    #$00
 VUBarCount        dw    #$04
 VUBarMaxTracks    =     #32                     ; I'm not sure of max tracks so doing 32 to be safe
