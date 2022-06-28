@@ -19,9 +19,6 @@
 KEY               equ   $C000
 STROBE            equ   $C010
 
-* update positions:  do the ascii, SL_SETWINDOWPOS stuff,
-
-
 
 ****
 *   PrepareTools
@@ -55,9 +52,7 @@ STROBE            equ   $C010
                   typ   $ff
                   mx    %11
 
-*    jsr HEX24TODEC8
-*    jsr DEC8TOCHAR10R   
-*    lda CHAR10
+
                   jsr   InitTextTools
                   jsr   Setup80Col
                   
@@ -554,6 +549,7 @@ MenuEnterSelected mx    %00
                   jsr   PlayerUi
                   jsr   PlayerLoop
 :err
+                  jsr   UnloadNTP
                   rts
 PlayerUi          mx    %00                     ; @todo: this is a mess
                   sep   $30
@@ -657,41 +653,64 @@ RestoreDP         clc
                   bpl   :copy
                   rts
 
+UnloadNTP         mx %00
+                  clc                   ; I have trust issues..
+                  xce
+                  rep #$30      
+                  ~DisposeHandle BnkMODHnd
+                  _Err
+                  rts
 
 *********************************************************
-*                                               ; .... TEST CODE ....
-*                 lda   #$0003                  ; bank 3
-*                 sta   $02                     ; dp ptr hi
-*                 stz   $00                     ; dp ptr lo
-*                 PT_LoadFilenameToPtr 'ntp/engine.ntp';0
-*                 jsr   StartMusic
-*                 FUNHALT
-
 LoadNTP           mx    %11
                   clc
                   xce
                   rep   $30
                                                 ; >>>   PT_GetPrefix            ; returns ptr in A ...
                                                 ; >>>   PT_PrintProdosStr ; "/SENSEIPLAY/" is where we start
-                  lda   #$0005                  ; bank 3
-                  sta   $06                     ; dp ptr hi
-                  stz   $04                     ; dp ptr lo
-                  PT_LoadFilePtrToPtr 0;4
+
+
+* NEW STUFF      
+                  ldy #19                      ; size offset (3-byte) from file entry
+                  lda (0),Y
+                  and #$00FF
+                  tax                          ; 24 bit filesize to x/y
+                  ldy #17
+                  lda (0),Y
+                  tay
+                  jsr AllocContiguousPageAlign  ; allocate that much
+                  sta BnkMODHnd+2               ; save the handle
+                  stx BnkMODHnd
+
+                  
+                  stx   $08                     ; dereference ptr
+                  sta   $0a                     
+                  ldy #0
+                  ldal [$8],Y
+                  sta $04
+                  sta BnkMODPtr                 ; save for easy access
+                  ldy #2
+                  ldal [$8],Y
+                  sta $06
+                  sta BnkMODPtr+2
+                  PT_LoadFilePtrToPtr 0;4       ; and load file into allocated RAM
                   rts
 
 
-StartMusic        mx    %00
-                  ldy   #$0005
-                  ldx   #0
+StartMusic        mx    %00               
+                  ldx BnkMODPtr
+                  ldy BnkMODPtr+2
+                  lda #0 ; no channel doubling
                   jsr   _NTPprepare
                   bcc   :ok
-
                   jsr   HoldUp
                   sec
                   rts
 
 :ok               lda   #0
                   jsr   _NTPplay
+                  sep $30
+                  
                   clc
                   rts
 
@@ -858,6 +877,9 @@ QuitParm          dfb   4                       ; number of parameters
 MasterId          ds    2
 UserId            ds    2
 BnkNTP            hex   0000                    ; used for NTP engine
+BnkMOD            hex   0000                    ; used for MOD loading... there may be multiple banks but it must be contiguous starting at this one.
+BnkMODHnd         hex   00000000
+BnkMODPtr         adrl  00000000
 Bnk0Hnd           hex   00000000
 Bnk1Hnd           hex   00000000
 

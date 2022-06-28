@@ -697,6 +697,11 @@ _TLShutDown       MAC
 _NewHandle        MAC
                   Tool  $902
                   <<<
+~DisposeHandle    MAC
+                  PushLong   ]1
+_DisposeHandle    MAC
+                  Tool  $1002
+                  <<<
 _MMStartUp        MAC
                   Tool  $202
                   <<<
@@ -775,8 +780,7 @@ AllocOneBank      mx    %00
                   rts
 
 
-
-* X/Y = length in bytes (24bit)
+* X/Y = length in bytes (24bit); returns handle in x/a ??
 AllocContiguousPageAlign mx %00
                   PushLong #0                   ; result space
                   PushLongXY
@@ -788,14 +792,7 @@ AllocContiguousPageAlign mx %00
                   _Err
                   plx                           ; base address of the new handle
                   pla                           ; high address 00XX of the new handle (bank)
-                  xba                           ; swap accumulator bytes to XX00
-                  sta   :bank+2                 ; store as bank for next op (overwrite $XX00)
-:bank             ldal  $000001,X               ; recover the bank address in A=XX/00
                   rts
-
-
-
-
 
 
 
