@@ -58,9 +58,7 @@ STROBE            equ   $C010
                   
                   jsr   TextColorSet
                   jsr   DrawMenuBackground
-                  jsr   DrawNinjaAnimIn
-
-                           
+                  jsr   DrawNinjaAnimIn                         
 
                                                 ;  jsr   P8CALL_GET_PREFIX
                                                 ; lda   P8BUFF_PREFIXPATH
@@ -130,7 +128,7 @@ MenuHandlePrefixChange mx %11
 
 SelectorInit      mx    %00
 :setup            SL_SETWINDOWPOS 31;11
-                  SL_SETWINDOWSIZE 32;8         
+                  SL_SETWINDOWSIZE 32;10         
                   SL_SETRENDERFUNCTION DirectoryRenderItem
                   lda   DirListCount
                   sta   SL_itemscount
@@ -570,7 +568,7 @@ PlayerUi          mx    %00                     ; @todo: this is a mess
                   jsr   SetPtr0toDirEntry
 
                   sep   $30
-                  GOXY  #30;VUBarY-2
+                  GOXY  #32;VUBarY-2
 
                   clc
                   xce
@@ -587,20 +585,38 @@ PlayerUi          mx    %00                     ; @todo: this is a mess
 
 :set_vu_x_offset  lda   [0]                     ; number of tracks
                   sta   VUBarCount
-                  cmp   #$4+1                   ;  set x offset based on how many tracks  (<=4), (<=8), (>8)
-                  bcs   :over_4
-:4_or_fewer       lda   #27
-                  sta   VUBarX
-                  bra   :vu_offset_complete
-:over_4           cmp   #$8+1
-                  bcs   :over_8
-:5_to_8           lda   #20
-                  sta   VUBarX
-                  bra   :vu_offset_complete
-:over_8
-                  lda   #6
-                  sta   VUBarX
-:vu_offset_complete
+                  tax
+                  
+                  lda #34   ; midpoint, eh?
+:to_tha_left      dex
+                  beq :vu_offset_complete
+                  sec
+                  sbc #2
+                  cmp #3
+                  bcc :vu_offset_complete   ; cant go left-er
+                  bra :to_tha_left
+
+*                   cmp   #$4+1                   ;  set x offset based on how many tracks  (<=4), (<=8), (>8)
+*                   bcs   :over_4
+* :4_or_fewer       lda   #27
+*                   sta   VUBarX
+*                   bra   :vu_offset_complete
+* :over_4           cmp   #$8+1
+*                   bcs   :over_8
+* :5_to_8           lda   #20
+*                   sta   VUBarX
+*                   bra   :vu_offset_complete
+* :over_8
+*                   lda   #6
+*                   sta   VUBarX
+
+
+
+
+
+
+
+:vu_offset_complete sta VUBarX
 
 :render_vu_boxes  jsr   RenderVUBoxes
 
@@ -717,25 +733,117 @@ StartMusic        mx    %00
 
 HoldUp            mx    %00
                   sep   $30
+                  jsr DrawNinjaBubble
+                  jsr DrawNinjaInPlace
+                  GOXY #36;#13
+                  lda #CantPlayFileString
+                  ldy #>CantPlayFileString
+                  ldx #36 ; horiz pos
+                  jsr PrintStringsX
+
+                  
+                  GOXY #3;#14
+                   lda #NinjaAngryBrows
+                  ldy #>NinjaAngryBrows
+                  
+                  ldx #3 ; horiz pos
+                  jsr PrintStringsX
+
+                  
+
                   lda   $c034
                   pha
 
-
-                  ldy   #80                     ; delay
-
-:wait_vbl_start   lda   $c019
-                  bpl   :wait_vbl_start
-:wait_vbl_end     inc   $c034
-                  lda   $c019
-                  bmi   :wait_vbl_end
-
-                  lda   #1
-                  sta   $c034
-                  dey
-                  bne   :wait_vbl_start
+**** NEW routine
+                  jsr BorderCops
                   pla
                   sta   $c034
+                  
+:cleanup          jsr   DrawMenuBackground
+                  jsr   DrawNinjaInPlace
                   rts
+*** END routine
+
+
+ColorSeq          db  $00
+                  db  01
+                  db  08
+                  db  08
+                  db  09
+                  db  08
+                  db  08
+                  db  01
+                  db  00
+ColorSeqLen       = *-ColorSeq
+ColorSeqStart     db 0
+ColorSeqCurIndex  db 0
+ColorNext db 0
+ColorUpdateDelay db 0
+; vbl start ; border black ; wait for 0
+; line/2 change? get next color; store
+; start @ c034=$60 end $e0
+
+BorderCops        mx %00
+                  sep #$30
+                  stz 2 ; 2-3= 16 bit loop counter
+                  stz 3
+:loop          
+                  INCROLL ColorUpdateDelay;#20
+                  beq :incstart
+                  lda ColorSeqStart
+                  bra :noinc
+:incstart         INCROLL ColorSeqStart;#ColorSeqLen-1 ;\_ bump starting color
+:noinc            sta ColorSeqCurIndex                 ;/
+
+                  lda $c02e
+                  cmp #$60
+                  bcc :under
+                  cmp #$e0
+                  bcs :over
+:lineloop         sta 1
+                  jsr GetNextColor
+                  tay
+                  
+:lineswait        lda $c02e
+                  cmp 1
+                  beq :lineswait
+                  sty $c034
+                  cmp #$e0
+                  bcc :lineloop
+:under
+:over             stz $c034
+
+
+                  lda   KEY
+                  bpl   :nokey
+                  sta   STROBE
+:done16           sep #$30
+                  rts
+:nokey            
+                  clc 
+                  xce
+                  rep #$30
+                  INCROLL 2;#$2200   ; check delay
+                  beq :done16
+                  sep #$30                  
+                  bra :loop
+
+
+GetNextColor      mx %11
+                  INCROLL ColorSeqCurIndex;#ColorSeqLen-1     ; cmp to N-1 because index starts at 0
+                  tax
+                  lda ColorSeq,X
+                  rts
+
+INCROLL           MAC
+                  lda ]1
+                  cmp ]2
+                  beq _roll
+_noroll           inc 
+                  bra _store
+_roll             lda #0
+_store            sta ]1
+                  <<< 
 
                   mx %11
 WaitVBL           
@@ -1051,6 +1159,20 @@ DrawMenuBackground mx   %11
                   ldx   #00                     ; horiz pos
                   jmp   PrintStringsX           ; implied rts
 
+DrawNinjaBubble mx   %11
+
+                  GOXY  #0;#9
+
+                  lda   #NinjaBubble
+                  ldy   #>NinjaBubble
+                  ldx   #00                     ; horiz pos
+                  jmp   PrintStringsX           ; implied rts
+DrawNinjaInPlace  mx %11
+                  ldx   #3
+                  ldy   _dnai_y
+                  lda   _dnai_y_clip
+                  jmp   DrawNinjaXYClip
+
 DrawNinjaLoadEyes mx    %11
                   GOXY  #15;#15
                   PRINTSTR NinjaAppleEyesClose
@@ -1071,11 +1193,11 @@ DrawNinjaAnimIn   mx %11
                   jsr   DrawNinjaXYClip
                 
                   jsr   WaitVBL
-                  dec   _dnai_y         ; next pass start higher
                   inc   _dnai_y_clip
                   lda   _dnai_y_clip
                   cmp   _dnai_y_clip_max
                   beq   :done
+                  dec   _dnai_y         ; next pass start higher 
                   bra :loop
 :done             rts 
 _dnai_y          db 0   ; y start
@@ -1120,9 +1242,10 @@ IcoDirString      asc   'XY'," ",$00
 IcoParentString   asc   'KI'," ",$00
 IcoVolString      asc   'Z^'," ",$00
 IcoNoString       asc   "   ",$00
+CantPlayFileString asc  "Can't play this file!@#!",$00,$00,$00
 TitleStrs
                   asc   " _____________________________________________________________________________",00
-                  asc   'ZV_@ZVWVWVWV_',"SenseiPlay",'ZVWVWVWVWVWVWVWVWVWVWVWVWVWVWVWV_'," // Infinitum ",'ZWVWVWVW_',00
+                  asc   'ZV_@'," v0.0.0",'ZVWVWVWVWVWVWVWVWVWVWVW_',"Ninjaforce",'ZVWVWVWVWVWVWVWVWV_',"][ infinitum",'ZW_',00
                   asc   'ZLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL_',00
                   asc   'Z',"    _____                                _     ____     __                   ",'_',00
                   asc   'Z',"   / ___/  ___    ____    _____  ___    (_)   / __ \   / /  ____ _   __  __  ",'_',00
@@ -1130,8 +1253,10 @@ TitleStrs
                   asc   'Z',"  ___/ / /  __/ / / / / (__  ) /  __/ / /   / ____/  / /  / /_/ /  / /_/ /   ",'_',00
                   asc   'Z'," /____/  \___/ /_/ /_/ /____/  \___/ /_/   /_/      /_/   \__,_/   \__, /    ",'_',00
                   asc   'Z',"                                                                  /____/     ",'_',00
-                  asc   'Z',"                              Choose a track:                                ",'_',00
+                  asc   'Z',"                                     Choose a track:                         ",'_',00
                   asc   'Z',"                             _________________________________               ",'_',00
+                  asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
+                  asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
                   asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
                   asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
                   asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
@@ -1142,12 +1267,22 @@ TitleStrs
                   asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
                   asc   'Z',"                             ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',"               ",'_',00
                   asc   'Z',"                                                                             ",'_',00
-                  asc   'Z',"                                                                             ",'_',00
-
-                  asc   'Z',"                                                                             ",'_',00
                   asc   " ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'," ",00        
                   hex   00,00
-
+NinjaBubble       asc   'Z',"                                                                             ",'_',00
+                  asc   'Z',"                             _________________________________               ",'_',00
+                  asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
+                  asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
+                  asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
+                  asc   'Z',"                            /                                 ",'_',"              ",'_',00
+                  asc   'Z',"                           /                                  ",'_',"              ",'_',00
+                  asc   'Z',"                          /                                   ",'_',"              ",'_',00
+                  asc   'Z',"                          ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',"               ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
+                  asc   'Z',"                                                                             ",'_',00
+                  hex   00,00
 NinjaStrs         asc   "                        ",00
                   asc   "           ______       ",00
                   asc   "         .'      `.     ",00
@@ -1164,6 +1299,7 @@ NinjaStrs         asc   "                        ",00
                   asc   "/                      \",00
                   hex   00,00,00,00,00,00   ; not needed
 NinjaAppleEyesClose asc '@',"     ",'@',00
+NinjaAngryBrows asc   "   _.:'|   ,-\---/--|   ",00,00,00
                  mx %11
 ; x = x, y=y, clip = ylines to draw before stopping
 DrawNinjaXYClip   jsr SetYClip ; with A value
@@ -1174,10 +1310,10 @@ DrawNinjaXYClip   jsr SetYClip ; with A value
                   rts
 
 
-NowPlayingStrs    asc   'Z',"                          Now Playing:                                       ",'_',00
-                  asc   'Z',"                       ____________________________                          ",'_',00
-                  asc   'Z',"                      ",'Z',"                            ",'_',"                         ",'_',00
-                  asc   'Z',"                       ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLL',"                          ",'_',00
+NowPlayingStrs    asc   'Z',"                                Now Playing:                                 ",'_',00
+                  asc   'Z',"                              _________________                              ",'_',00
+                  asc   'Z',"                             ",'Z',"                 ",'_',"                             ",'_',00
+                  asc   'Z',"                              ",'LLLLLLLLLLLLLLLLL',"                              ",'_',00
                   asc   'Z',"                                                                             ",'_',00
                   asc   'Z',"                                                                             ",'_',00
                   asc   'Z',"                                                                             ",'_',00
