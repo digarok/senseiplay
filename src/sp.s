@@ -52,7 +52,6 @@ STROBE            equ   $C010
                   typ   $ff
                   mx    %11
 
-
                   jsr   InitTextTools
                   jsr   Setup80Col
                   
@@ -60,7 +59,7 @@ STROBE            equ   $C010
                   jsr   DrawMenuBackground
                   jsr   DrawNinjaAnimIn                         
 
-                                                ;  jsr   P8CALL_GET_PREFIX
+                                                ; jsr   P8CALL_GET_PREFIX
                                                 ; lda   P8BUFF_PREFIXPATH
                                                 ; jsr   P8CALL_ONLINE
                                                 ; lda   P8BUFF_DRIVES_ONLINE
@@ -784,11 +783,22 @@ ColorUpdateDelay db 0
 ; start @ c034=$60 end $e0
 
 BorderCops        mx %00
+                   clc
+                   xce
                   sep #$30
+                  lda #$88 ;min bar
+                  sta 4
+                  lda #$D8 ;max bar
+                  sta 5
+
+                  stz ColorUpdateDelay
+                  stz ColorSeqStart
+                  stz ColorSeqCurIndex
                   stz 2 ; 2-3= 16 bit loop counter
                   stz 3
-:loop          
-                  INCROLL ColorUpdateDelay;#20
+:loop             ;stz ColorSeqStart                     ; del
+                  ;stz ColorSeqCurIndex                  ; del
+                  INCROLL ColorUpdateDelay;#$80
                   beq :incstart
                   lda ColorSeqStart
                   bra :noinc
@@ -796,9 +806,9 @@ BorderCops        mx %00
 :noinc            sta ColorSeqCurIndex                 ;/
 
                   lda $c02e
-                  cmp #$60
+                  cmp 4
                   bcc :under
-                  cmp #$e0
+                  cmp 5
                   bcs :over
 :lineloop         sta 1
                   jsr GetNextColor
@@ -808,7 +818,7 @@ BorderCops        mx %00
                   cmp 1
                   beq :lineswait
                   sty $c034
-                  cmp #$e0
+                  cmp 5
                   bcc :lineloop
 :under
 :over             stz $c034
@@ -820,8 +830,6 @@ BorderCops        mx %00
 :done16           sep #$30
                   rts
 :nokey            
-                  clc 
-                  xce
                   rep #$30
                   INCROLL 2;#$2200   ; check delay
                   beq :done16
