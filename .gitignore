@@ -1,2 +1,7 @@
 # used for local user files that should never get checked in
 local/
+# Merlin
+*_Output.txt  
+*.system
+# appy
+appy.user.yaml

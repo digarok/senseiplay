@@ -444,6 +444,7 @@ ShowTrackPos      clc
                   jsr   PrHex
 
 
+                  rts                           ;; <- remove for additional debugging
                   GOXY  #22;#22                 ;;; debug show track pos
                   ldy   #2
                   ldal  [0],y
@@ -516,7 +517,6 @@ SetPtr0toDirEntry mx    %00
                   bne   :calc_item_start
 :continue         sta   0                       ; address of string at zero
                   rts
-
 
 MenuEnterSelected mx    %00
                   jsr   SL_GetSelected
@@ -621,7 +621,7 @@ PlayerUi          mx    %00                     ; @todo: this is a mess
 
                   rts
 
-MenuActionsCount  =     7
+
 MenuActions       db    #'w'
                   db    #'W'
                   db    #$0B                    ; up
@@ -632,6 +632,11 @@ MenuActions       db    #'w'
 
                   db    #$0D                    ; enter
 
+                  db    #'q'                    ; quit
+                  db    #'Q'                    
+                  db    $1b                     ; esc
+                  db    #'?'
+MenuActionsCount  =     *-MenuActions           
 
 MenuRoutines      da    SL_DecSelected
                   da    SL_DecSelected
@@ -643,7 +648,12 @@ MenuRoutines      da    SL_DecSelected
 
                   da    MenuEnterSelected
 
+                  da    QuitRoutine
+                  da    QuitRoutine
+                  da    QuitRoutine
 
+                  da    DoHelp
+                  
 
 
 _DPBAK            ds    256
@@ -678,6 +688,27 @@ UnloadNTP         mx %00
 
 *********************************************************
 LoadNTP           mx    %11
+
+                *   sep   $30
+                *   lda $0
+                *   ldy $1
+                *   pha 
+                *   phy
+                * ;  jsr DrawNinjaBubble
+                * ;  jsr DrawNinjaInPlace
+                *   GOXY #36;#13
+                *   lda #LoadingFileString
+                *   ldy #>LoadingFileString
+                * ;  ldx #36 ; horiz pos
+                * ;  jsr PrintStringsX
+                *   lda 0                         ; filename
+                *   >>> PT_PrintProdosStr
+                *   ply
+                *   pla
+                *   sta $0
+                *   sty $1
+
+                  
                   clc
                   xce
                   rep   $30
@@ -831,7 +862,7 @@ BorderCops        mx %00
                   rts
 :nokey            
                   rep #$30
-                  INCROLL 2;#$2200   ; check delay
+                  INCROLL 2;#$2F00   ; check delay
                   beq :done16
                   sep #$30                  
                   bra :loop
@@ -972,6 +1003,11 @@ PgmDeath0         pha
 ContDeath         ldx   #$1503
                   jsl   $E10000
 
+QuitRoutine       mx   %00
+                  sec
+                  xce
+                  sep #$30
+                  bra P8Quit
 
 ******************************************
 * Standard ProDOS 8 Quit routine         *
@@ -1093,7 +1129,8 @@ BigNum            MAC
 * lda #MainMenuStrs
 * ldy #>MainMenuStrs
 * ldx #05 ; horiz pos
-PrintStringsX     stx   _printstringsx_horiz
+PrintStringsX     mx  %11
+                  stx   _printstringsx_horiz
 
                   sta   $0
                   sty   $1
@@ -1152,9 +1189,26 @@ PrintStringsXYClip     stx   _printstringsx_horiz
 :done             rts
 
 Setup80Col        mx    %11
-                  lda   #$A0                    ;USE A BLANK SPACE TO
-                  jsr   $C300                   ;TURN ON THE VIDEO FIRMWARE
+                  lda   #$A0                    ; USE A BLANK SPACE TO
+                  jsr   $C300                   ; TURN ON THE VIDEO FIRMWARE
                   rts
+
+DoHelp mx   %00 ; comes from MenuAction
+                  sep  #$30
+                        
+                  jsr   text_clear              ; clear screen
+                  stz   text_h                  ; set top left corner (HOME)
+                  stz   text_v
+
+                  lda   #HelpStrs
+                  ldy   #>HelpStrs
+                  ldx   #00                     ; horiz pos
+                  jsr   PrintStringsX    
+                  jsr   WaitKey                
+:cleanup          jsr   DrawMenuBackground
+                  jmp   DrawNinjaInPlace
+                  
+                  
 
 DrawMenuBackground mx   %11
 
@@ -1168,13 +1222,12 @@ DrawMenuBackground mx   %11
                   jmp   PrintStringsX           ; implied rts
 
 DrawNinjaBubble mx   %11
-
                   GOXY  #0;#9
-
                   lda   #NinjaBubble
                   ldy   #>NinjaBubble
                   ldx   #00                     ; horiz pos
                   jmp   PrintStringsX           ; implied rts
+
 DrawNinjaInPlace  mx %11
                   ldx   #3
                   ldy   _dnai_y
@@ -1251,9 +1304,14 @@ IcoParentString   asc   'KI'," ",$00
 IcoVolString      asc   'Z^'," ",$00
 IcoNoString       asc   "   ",$00
 CantPlayFileString asc  "Can't play this file!@#!",$00,$00,$00
+LoadingFileString asc   "Loading ",$00,$00,$00
+HelpStrs          asc   "   Press Q to quit.   ",00
+                  asc   " ",00
+                  asc   "                ;)",00,00,00
+
 TitleStrs
                   asc   " _____________________________________________________________________________",00
-                  asc   'ZV_@'," v0.0.0",'ZVWVWVWVWVWVWVWVWVWVWVW_',"Ninjaforce",'ZVWVWVWVWVWVWVWVWV_',"][ infinitum",'ZW_',00
+                  asc   'ZV_@'," v0.0.3",'ZVWVWVWVWVWVWVWVWVWVWVW_',"Ninjaforce",'ZVWVWVWVWVWVWVWVWV_',"][ infinitum",'ZW_',00
                   asc   'ZLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL_',00
                   asc   'Z',"    _____                                _     ____     __                   ",'_',00
                   asc   'Z',"   / ___/  ___    ____    _____  ___    (_)   / __ \   / /  ____ _   __  __  ",'_',00

@@ -7,7 +7,7 @@
 
 ** scroll-center algorithm
 ** - if selected item is over half the value of the window height then offset becomes selected minus window height /2
-** - if at the end, the offfset is greater than list size minus window height then offset = list size minus window height (stop scrolling)
+** - if at the end, the offset is greater than list size minus window height then offset = list size minus window height (stop scrolling)
 
 ** init example - set window and list properties
 ** 

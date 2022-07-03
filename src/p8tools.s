@@ -18,9 +18,9 @@ P8_DIR_ENT_OFFSET_TYPE = $10
 P8_DIR_ENT_OFFSET_LEN = $15                     ; $15-17
 
 
-********************************************************** ONLINE ($C5)
-P8_ONLINE         =     $C5
-P8_ONLINE_PCNT    =     2
+********************************************************** ON_LINE ($C5)
+P8_ON_LINE         =     $C5
+P8_ON_LINE_PCNT    =     2
 *       +-----------------------+
 *     0 | Number of Parms (2)   |
 *       +-----------------------+
@@ -165,9 +165,9 @@ _PT_ReadOnline    mx    %00
                   sta   _PT_PARMTABLE+2
                   sep   #$30
                   stz   _PT_PARMTABLE+1         ; zero unit number will return all
-                  lda   #P8_ONLINE              ; set up GET_PREFIX call
+                  lda   #P8_ON_LINE              ; set up ON_LINE call
                   sta   PT_P8CALL_NUM
-                  lda   #P8_ONLINE_PCNT         ; build GET_PREFIX parm table
+                  lda   #P8_ON_LINE_PCNT         ; build ON_LINE parm table
                   sta   _PT_PARMTABLE
                   jsr   PT_P8CALL               ; returns in emulation 8-bit mode
 
@@ -181,26 +181,29 @@ _PT_ReadOnline    mx    %00
 :read_online_entry ldy  #0
                   lda   (PT_TMP_PTR),y
                   and   #$0f
+                  bne   :entry
+                  iny
+                  lda   (PT_TMP_PTR),y
                   beq   :no_more_entries
-
-                  ldx   #$0F                    ; 16 bytes
+                  bne   :skip_entry             ; skip bad entry
+:entry            ldx   #$0F                    ; 16 bytes
 :copy_entry
                   lda   (PT_TMP_PTR),y
                   sta   [PT_DST_PTR],y          ; this doesn't make sense but it doesn't matter either
                   iny
                   dex
                   bpl   :copy_entry
-:inc_ptrs         lda   PT_TMP_PTR
-                  clc
-                  adc   #$10
-                  sta   PT_TMP_PTR
-                  lda   PT_DST_PTR
+:inc_ptrs         rep   $30
+                  inc   _PT_ReadDirCount        ; inc the # of vols we know about
+                  sep   $30
+                  lda   PT_DST_PTR              ; inc our dir list write ptr
                   clc
                   adc   #DirListEntrySize
                   sta   PT_DST_PTR
-                  rep   $30
-                  inc   _PT_ReadDirCount
-                  sep   $30
+:skip_entry       lda   PT_TMP_PTR              ; inc the on_line buffer read ptr
+                  clc
+                  adc   #$10
+                  sta   PT_TMP_PTR
                   bra   :read_online_entry
 
 :no_more_entries  rep   $30
@@ -220,7 +223,7 @@ _PT_SetPrefix     mx    %00
                   sep   #$30
                   lda   #P8_SET_PREFIX          ; set up SET_PREFIX call
                   sta   PT_P8CALL_NUM
-                  lda   #P8_GET_PREFIX_PCNT     ; build SET_PREFIX parm table
+                  lda   #P8_SET_PREFIX_PCNT     ; build SET_PREFIX parm table
                   sta   _PT_PARMTABLE
                   jsr   PT_P8CALL               ; returns in emulation 8-bit mode
                   clc
@@ -820,8 +823,31 @@ AllocContiguousPageAlign mx %00
 *00/0D58:00 00 00 00 00 00 00 00-........
 *00/0D60:00-.
 
-** ONLINE VOLUME ENTRIES LOOK LIKE THIS
+** ON_LINE VOLUME ENTRIES LOOK LIKE THIS
 *  I KEEP THE HIGH NIBBLE FOR NOTING THE VOLUME TYPE AND UNIT NUMBER
+* > When multiple records are returned, the last valid
+* > record is followed by one that has unit_num and
+* > name_length set to 0.
+*0d00.0df0
+
+* 00/0D00:B3 52 41 4D 00 00 00 00 00 00 00 00 00 00 00 00-3RAM............
+* 00/0D10:74 47 53 4F 53 00 00 00 00 00 00 00 00 00 00 00-tGSOS...........
+* 00/0D20:FB 4E 54 50 54 45 53 54 4D 4F 44 53 00 00 00 00-{NTPTESTMODS....
+* 00/0D30:5A 53 45 4E 53 45 49 50 4C 41 59 00 00 00 00 00-ZSENSEIPLAY.....
+* 00/0D40:D0 2F 00 00 00 00 00 00 00 00 00 00 00 00 00 00-P/..............
+* 00/0D50:49 44 45 4D 4F 44 52 49 56 45 00 00 00 00 00 00-IDEMODRIVE......
+* 00/0D60:60 27 00 00 00 00 00 00 00 00 00 00 00 00 00 00-`'..............
+* 00/0D70:E0 27 00 00 00 00 00 00 00 00 00 00 00 00 00 00-`'..............
+* 00/0D80:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00-................
+* 00/0D90:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00-................
+* 00/0DA0:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00-................
+* 00/0DB0:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00-................
+* 00/0DC0:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00-................
+* 00/0DD0:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00-................
+* 00/0DE0:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00-................
+* 00/0DF0:00-.
+
+
 *0d00.0df0
 *00/0D00:B3 52 41 4D 00 00 00 00 00 00 00 00 00 00 00 00-3RAM............
 *00/0D10:74 47 53 4F 53 00 00 00 00 00 00 00 00 00 00 00-tGSOS...........
@@ -834,6 +860,8 @@ AllocContiguousPageAlign mx %00
 *00/0DE0:00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00-................
 *00/0DF0:00-.
 *
+
+
 
                   FIN
 
