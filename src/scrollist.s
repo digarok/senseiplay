@@ -10,7 +10,7 @@
 ** - if at the end, the offset is greater than list size minus window height then offset = list size minus window height (stop scrolling)
 
 ** init example - set window and list properties
-** 
+**
 **                  SL_SETWINDOWPOS 31;11               ; set position
 **                  SL_SETWINDOWSIZE 22;8               ; set size
 **                  SL_SETRENDERFUNCTION MyItemRender   ; set item renderer function

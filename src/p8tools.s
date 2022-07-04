@@ -19,8 +19,8 @@ P8_DIR_ENT_OFFSET_LEN = $15                     ; $15-17
 
 
 ********************************************************** ON_LINE ($C5)
-P8_ON_LINE         =     $C5
-P8_ON_LINE_PCNT    =     2
+P8_ON_LINE        =     $C5
+P8_ON_LINE_PCNT   =     2
 *       +-----------------------+
 *     0 | Number of Parms (2)   |
 *       +-----------------------+
@@ -165,9 +165,9 @@ _PT_ReadOnline    mx    %00
                   sta   _PT_PARMTABLE+2
                   sep   #$30
                   stz   _PT_PARMTABLE+1         ; zero unit number will return all
-                  lda   #P8_ON_LINE              ; set up ON_LINE call
+                  lda   #P8_ON_LINE             ; set up ON_LINE call
                   sta   PT_P8CALL_NUM
-                  lda   #P8_ON_LINE_PCNT         ; build ON_LINE parm table
+                  lda   #P8_ON_LINE_PCNT        ; build ON_LINE parm table
                   sta   _PT_PARMTABLE
                   jsr   PT_P8CALL               ; returns in emulation 8-bit mode
 
@@ -701,7 +701,7 @@ _NewHandle        MAC
                   Tool  $902
                   <<<
 ~DisposeHandle    MAC
-                  PushLong   ]1
+                  PushLong ]1
 _DisposeHandle    MAC
                   Tool  $1002
                   <<<

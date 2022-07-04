@@ -11,8 +11,8 @@ VUBarMaxTracks    =     #32                     ; I'm not sure of max tracks so 
 
 
 
-VUOnString       asc   'VW',$00
-VUOffString        asc   'II',$00  ; G I 
+VUOnString        asc   'VW',$00
+VUOffString       asc   'II',$00                 ; G I
 
 VUBoxTopString    asc   " __ ",00
 VUBoxMidString    asc   'Z',"  ",'_',00

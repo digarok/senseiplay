@@ -54,10 +54,10 @@ STROBE            equ   $C010
 
                   jsr   InitTextTools
                   jsr   Setup80Col
-                  
+
                   jsr   TextColorSet
                   jsr   DrawMenuBackground
-                  jsr   DrawNinjaAnimIn                         
+                  jsr   DrawNinjaAnimIn
 
                                                 ; jsr   P8CALL_GET_PREFIX
                                                 ; lda   P8BUFF_PREFIXPATH
@@ -127,7 +127,7 @@ MenuHandlePrefixChange mx %11
 
 SelectorInit      mx    %00
 :setup            SL_SETWINDOWPOS 31;11
-                  SL_SETWINDOWSIZE 32;10         
+                  SL_SETWINDOWSIZE 32;10
                   SL_SETRENDERFUNCTION DirectoryRenderItem
                   lda   DirListCount
                   sta   SL_itemscount
@@ -177,9 +177,9 @@ DirectoryRenderItem mx  %00
 :normal_dir       PRINTSTR IcoDirString
                   bra   :continue2
 :not_dir          PRINTSTR IcoNoString
-                  dec  _sl_show_size            ; turn on filesize printing
-:continue2        lda #4                        ;\_ inc the character count since we printed...
-                  sta _sl_char_count            ;/    this could be optimized out but I'm leaving it for flexibility.
+                  dec   _sl_show_size           ; turn on filesize printing
+:continue2        lda   #4                      ;\_ inc the character count since we printed...
+                  sta   _sl_char_count          ;/    this could be optimized out but I'm leaving it for flexibility.
                   lda   (0)                     ; get len byte
                   and   #$0F
                   tax                           ;  .. counter
@@ -201,76 +201,76 @@ DirectoryRenderItem mx  %00
                   inc   _sl_char_count
                   iny
                   dex
-                  bne   :pr_loop  
+                  bne   :pr_loop
 
 :pad_out          sep   $30                     ; leave this, could be coming from above 16-bit area
                   lda   SL_windowsize_x
                   sec
                   sbc   _sl_char_count          ; win_x - printed chars = pad amount
-                  ldx _sl_show_size             ; check if we are printing 10 char size string too
-                  beq :no_size_pad
+                  ldx   _sl_show_size           ; check if we are printing 10 char size string too
+                  beq   :no_size_pad
                   sbc   #10
 
-:no_size_pad      tax                          
+:no_size_pad      tax
 
 :pad_space        lda   #" "
                   jsr   COOT8
                   dex
                   bne   :pad_space
 
-:size_test        lda _sl_show_size
-                  beq :done
-                
-                  ldy #17 ; size offset (3-byte)
-                  lda (0),Y
-                  sta HEX24   ; set conversion bytes
-                  iny
-                  lda (0),Y
-                  sta HEX24+1 
-                  iny
-                  lda (0),Y
-                  sta HEX24+2
+:size_test        lda   _sl_show_size
+                  beq   :done
 
-                  jsr HEX24TODEC8
-                  jsr DEC8TOCHAR10R
-                  ldx #0
-:loop             lda CHAR10,x
-                  jsr COOT8
+                  ldy   #17                     ; size offset (3-byte)
+                  lda   (0),Y
+                  sta   HEX24                   ; set conversion bytes
+                  iny
+                  lda   (0),Y
+                  sta   HEX24+1
+                  iny
+                  lda   (0),Y
+                  sta   HEX24+2
+
+                  jsr   HEX24TODEC8
+                  jsr   DEC8TOCHAR10R
+                  ldx   #0
+:loop             lda   CHAR10,x
+                  jsr   COOT8
                   inx
-                  cpx #10
-                  bne :loop
-:done             rep $30
+                  cpx   #10
+                  bne   :loop
+:done             rep   $30
                   rts
 
 
-                    ldy #19
-                    lda (0),Y
-                    sta HEX24+2 ; set for conv
-            ;       jsr PrHex 
-                    ldy #18
-                    lda (0),Y
-                    sta HEX24+1 ; set for conv
-             ;      jsr PrHex 
-                    ldy #17
-                    lda (0),Y
-                    sta HEX24+0 ; set for conv
-           ;        jsr PrHex 
+                  ldy   #19
+                  lda   (0),Y
+                  sta   HEX24+2                 ; set for conv
+                                                ;       jsr PrHex
+                  ldy   #18
+                  lda   (0),Y
+                  sta   HEX24+1                 ; set for conv
+                                                ;      jsr PrHex
+                  ldy   #17
+                  lda   (0),Y
+                  sta   HEX24+0                 ; set for conv
+                                                ;        jsr PrHex
 
-                   jsr HEX24TODEC8
-                   jsr DEC8TOCHAR10R
-              lda #" " 
-              jsr COOT8
-    
+                  jsr   HEX24TODEC8
+                  jsr   DEC8TOCHAR10R
+                  lda   #" "
+                  jsr   COOT8
+
 
 *    jsr HEX24TODEC8
-*    jsr DEC8TOCHAR10R   
+*    jsr DEC8TOCHAR10R
 *    lda CHAR10
 
 
                   rep   #$30
                   rts
 _sl_char_count    dw    0                       ; used for width checking strings
-_sl_show_size     dw 0
+_sl_show_size     dw    0
 
 
 
@@ -294,7 +294,7 @@ MenuLoop          clc
                   bpl   MenuLoop
                   sta   STROBE
 
-                  lda   KEY                     
+                  lda   KEY
                   ldx   #0                      ; index/counter
 :find_key         cmp   MenuActions,x           ; go through all the keys we know about
                   beq   :found_key
@@ -319,8 +319,8 @@ MenuLoop          clc
                   pha                           ; hex debug
                   GOXY  #75;#22                 ;
                   pla                           ;
-                  jsr   PrHex                   
-              
+                  jsr   PrHex
+
                   bra   MenuLoop
 ******************************************************************  <<<<<<<<<<<<<<
 
@@ -585,15 +585,15 @@ PlayerUi          mx    %00                     ; @todo: this is a mess
 :set_vu_x_offset  lda   [0]                     ; number of tracks
                   sta   VUBarCount
                   tax
-                  
-                  lda #34   ; midpoint, eh?
+
+                  lda   #34                     ; midpoint, eh?
 :to_tha_left      dex
-                  beq :vu_offset_complete
+                  beq   :vu_offset_complete
                   sec
-                  sbc #2
-                  cmp #3
-                  bcc :vu_offset_complete   ; cant go left-er
-                  bra :to_tha_left
+                  sbc   #2
+                  cmp   #3
+                  bcc   :vu_offset_complete     ; cant go left-er
+                  bra   :to_tha_left
 
 *                   cmp   #$4+1                   ;  set x offset based on how many tracks  (<=4), (<=8), (>8)
 *                   bcs   :over_4
@@ -632,11 +632,11 @@ MenuActions       db    #'w'
 
                   db    #$0D                    ; enter
 
-                  db    #'q'                    ; quit
-                  db    #'Q'                    
+                  db    #'q'                     ; quit
+                  db    #'Q'
                   db    $1b                     ; esc
                   db    #'?'
-MenuActionsCount  =     *-MenuActions           
+MenuActionsCount  =     *-MenuActions
 
 MenuRoutines      da    SL_DecSelected
                   da    SL_DecSelected
@@ -653,7 +653,7 @@ MenuRoutines      da    SL_DecSelected
                   da    QuitRoutine
 
                   da    DoHelp
-                  
+
 
 
 _DPBAK            ds    256
@@ -678,10 +678,10 @@ RestoreDP         clc
                   bpl   :copy
                   rts
 
-UnloadNTP         mx %00
-                  clc                   ; I have trust issues..
+UnloadNTP         mx    %00
+                  clc                           ; I have trust issues..
                   xce
-                  rep #$30      
+                  rep   #$30
                   ~DisposeHandle BnkMODHnd
                   _Err
                   rts
@@ -689,26 +689,26 @@ UnloadNTP         mx %00
 *********************************************************
 LoadNTP           mx    %11
 
-                *   sep   $30
-                *   lda $0
-                *   ldy $1
-                *   pha 
-                *   phy
-                * ;  jsr DrawNinjaBubble
-                * ;  jsr DrawNinjaInPlace
-                *   GOXY #36;#13
-                *   lda #LoadingFileString
-                *   ldy #>LoadingFileString
-                * ;  ldx #36 ; horiz pos
-                * ;  jsr PrintStringsX
-                *   lda 0                         ; filename
-                *   >>> PT_PrintProdosStr
-                *   ply
-                *   pla
-                *   sta $0
-                *   sty $1
+                  *   sep   $30
+                  *   lda $0
+                  *   ldy $1
+                  *   pha
+                  *   phy
+                  * ;  jsr DrawNinjaBubble
+                  * ;  jsr DrawNinjaInPlace
+                  *   GOXY #36;#13
+                  *   lda #LoadingFileString
+                  *   ldy #>LoadingFileString
+                  * ;  ldx #36 ; horiz pos
+                  * ;  jsr PrintStringsX
+                  *   lda 0                         ; filename
+                  *   >>> PT_PrintProdosStr
+                  *   ply
+                  *   pla
+                  *   sta $0
+                  *   sty $1
 
-                  
+
                   clc
                   xce
                   rep   $30
@@ -716,37 +716,37 @@ LoadNTP           mx    %11
                                                 ; >>>   PT_PrintProdosStr ; "/SENSEIPLAY/" is where we start
 
 
-* NEW STUFF      
-                  ldy #19                      ; size offset (3-byte) from file entry
-                  lda (0),Y
-                  and #$00FF
-                  tax                          ; 24 bit filesize to x/y
-                  ldy #17
-                  lda (0),Y
+* NEW STUFF
+                  ldy   #19                     ; size offset (3-byte) from file entry
+                  lda   (0),Y
+                  and   #$00FF
+                  tax                           ; 24 bit filesize to x/y
+                  ldy   #17
+                  lda   (0),Y
                   tay
-                  jsr AllocContiguousPageAlign  ; allocate that much
-                  sta BnkMODHnd+2               ; save the handle
-                  stx BnkMODHnd
+                  jsr   AllocContiguousPageAlign ; allocate that much
+                  sta   BnkMODHnd+2             ; save the handle
+                  stx   BnkMODHnd
 
-                  
+
                   stx   $08                     ; dereference ptr
-                  sta   $0a                     
-                  ldy #0
-                  ldal [$8],Y
-                  sta $04
-                  sta BnkMODPtr                 ; save for easy access
-                  ldy #2
-                  ldal [$8],Y
-                  sta $06
-                  sta BnkMODPtr+2
+                  sta   $0a
+                  ldy   #0
+                  ldal  [$8],Y
+                  sta   $04
+                  sta   BnkMODPtr               ; save for easy access
+                  ldy   #2
+                  ldal  [$8],Y
+                  sta   $06
+                  sta   BnkMODPtr+2
                   PT_LoadFilePtrToPtr 0;4       ; and load file into allocated RAM
                   rts
 
 
-StartMusic        mx    %00               
-                  ldx BnkMODPtr
-                  ldy BnkMODPtr+2
-                  lda #0 ; no channel doubling
+StartMusic        mx    %00
+                  ldx   BnkMODPtr
+                  ldy   BnkMODPtr+2
+                  lda   #0                      ; no channel doubling
                   jsr   _NTPprepare
                   bcc   :ok
                   jsr   HoldUp
@@ -755,137 +755,137 @@ StartMusic        mx    %00
 
 :ok               lda   #0
                   jsr   _NTPplay
-                  sep $30
-                  
+                  sep   $30
+
                   clc
                   rts
 
 
 HoldUp            mx    %00
                   sep   $30
-                  jsr DrawNinjaBubble
-                  jsr DrawNinjaInPlace
-                  GOXY #36;#13
-                  lda #CantPlayFileString
-                  ldy #>CantPlayFileString
-                  ldx #36 ; horiz pos
-                  jsr PrintStringsX
+                  jsr   DrawNinjaBubble
+                  jsr   DrawNinjaInPlace
+                  GOXY  #36;#13
+                  lda   #CantPlayFileString
+                  ldy   #>CantPlayFileString
+                  ldx   #36                     ; horiz pos
+                  jsr   PrintStringsX
 
-                  
-                  GOXY #3;#14
-                   lda #NinjaAngryBrows
-                  ldy #>NinjaAngryBrows
-                  
-                  ldx #3 ; horiz pos
-                  jsr PrintStringsX
 
-                  
+                  GOXY  #3;#14
+                  lda   #NinjaAngryBrows
+                  ldy   #>NinjaAngryBrows
+
+                  ldx   #3                      ; horiz pos
+                  jsr   PrintStringsX
+
+
 
                   lda   $c034
                   pha
 
 **** NEW routine
-                  jsr BorderCops
+                  jsr   BorderCops
                   pla
                   sta   $c034
-                  
+
 :cleanup          jsr   DrawMenuBackground
                   jsr   DrawNinjaInPlace
                   rts
 *** END routine
 
 
-ColorSeq          db  $00
-                  db  01
-                  db  08
-                  db  08
-                  db  09
-                  db  08
-                  db  08
-                  db  01
-                  db  00
-ColorSeqLen       = *-ColorSeq
-ColorSeqStart     db 0
-ColorSeqCurIndex  db 0
-ColorNext db 0
-ColorUpdateDelay db 0
+ColorSeq          db    $00
+                  db    01
+                  db    08
+                  db    08
+                  db    09
+                  db    08
+                  db    08
+                  db    01
+                  db    00
+ColorSeqLen       =     *-ColorSeq
+ColorSeqStart     db    0
+ColorSeqCurIndex  db    0
+ColorNext         db    0
+ColorUpdateDelay  db    0
 ; vbl start ; border black ; wait for 0
 ; line/2 change? get next color; store
 ; start @ c034=$60 end $e0
 
-BorderCops        mx %00
-                   clc
-                   xce
-                  sep #$30
-                  lda #$88 ;min bar
-                  sta 4
-                  lda #$D8 ;max bar
-                  sta 5
+BorderCops        mx    %00
+                  clc
+                  xce
+                  sep   #$30
+                  lda   #$88                    ;min bar
+                  sta   4
+                  lda   #$D8                    ;max bar
+                  sta   5
 
-                  stz ColorUpdateDelay
-                  stz ColorSeqStart
-                  stz ColorSeqCurIndex
-                  stz 2 ; 2-3= 16 bit loop counter
-                  stz 3
-:loop             ;stz ColorSeqStart                     ; del
-                  ;stz ColorSeqCurIndex                  ; del
+                  stz   ColorUpdateDelay
+                  stz   ColorSeqStart
+                  stz   ColorSeqCurIndex
+                  stz   2                       ; 2-3= 16 bit loop counter
+                  stz   3
+:loop                                           ;stz ColorSeqStart                     ; del
+                                                ;stz ColorSeqCurIndex                  ; del
                   INCROLL ColorUpdateDelay;#$80
-                  beq :incstart
-                  lda ColorSeqStart
-                  bra :noinc
+                  beq   :incstart
+                  lda   ColorSeqStart
+                  bra   :noinc
 :incstart         INCROLL ColorSeqStart;#ColorSeqLen-1 ;\_ bump starting color
-:noinc            sta ColorSeqCurIndex                 ;/
+:noinc            sta   ColorSeqCurIndex        ;/
 
-                  lda $c02e
-                  cmp 4
-                  bcc :under
-                  cmp 5
-                  bcs :over
-:lineloop         sta 1
-                  jsr GetNextColor
+                  lda   $c02e
+                  cmp   4
+                  bcc   :under
+                  cmp   5
+                  bcs   :over
+:lineloop         sta   1
+                  jsr   GetNextColor
                   tay
-                  
-:lineswait        lda $c02e
-                  cmp 1
-                  beq :lineswait
-                  sty $c034
-                  cmp 5
-                  bcc :lineloop
+
+:lineswait        lda   $c02e
+                  cmp   1
+                  beq   :lineswait
+                  sty   $c034
+                  cmp   5
+                  bcc   :lineloop
 :under
-:over             stz $c034
+:over             stz   $c034
 
 
                   lda   KEY
                   bpl   :nokey
                   sta   STROBE
-:done16           sep #$30
+:done16           sep   #$30
                   rts
-:nokey            
-                  rep #$30
-                  INCROLL 2;#$2F00   ; check delay
-                  beq :done16
-                  sep #$30                  
-                  bra :loop
+:nokey
+                  rep   #$30
+                  INCROLL 2;#$2F00              ; check delay
+                  beq   :done16
+                  sep   #$30
+                  bra   :loop
 
 
-GetNextColor      mx %11
-                  INCROLL ColorSeqCurIndex;#ColorSeqLen-1     ; cmp to N-1 because index starts at 0
+GetNextColor      mx    %11
+                  INCROLL ColorSeqCurIndex;#ColorSeqLen-1 ; cmp to N-1 because index starts at 0
                   tax
-                  lda ColorSeq,X
+                  lda   ColorSeq,X
                   rts
 
 INCROLL           MAC
-                  lda ]1
-                  cmp ]2
-                  beq _roll
-_noroll           inc 
-                  bra _store
-_roll             lda #0
-_store            sta ]1
-                  <<< 
+                  lda   ]1
+                  cmp   ]2
+                  beq   _roll
+_noroll           inc
+                  bra   _store
+_roll             lda   #0
+_store            sta   ]1
+                  <<<
 
-                  mx %11
-WaitVBL           
+                  mx    %11
+WaitVBL
 :wait_vbl_start   lda   $c019
                   bpl   :wait_vbl_start
 :wait_vbl_end     lda   $c019
@@ -1003,11 +1003,11 @@ PgmDeath0         pha
 ContDeath         ldx   #$1503
                   jsl   $E10000
 
-QuitRoutine       mx   %00
+QuitRoutine       mx    %00
                   sec
                   xce
-                  sep #$30
-                  bra P8Quit
+                  sep   #$30
+                  bra   P8Quit
 
 ******************************************
 * Standard ProDOS 8 Quit routine         *
@@ -1129,7 +1129,7 @@ BigNum            MAC
 * lda #MainMenuStrs
 * ldy #>MainMenuStrs
 * ldx #05 ; horiz pos
-PrintStringsX     mx  %11
+PrintStringsX     mx    %11
                   stx   _printstringsx_horiz
 
                   sta   $0
@@ -1154,18 +1154,18 @@ PrintStringsX     mx  %11
 :done             rts
 
 _printstringsx_horiz db 00
-_printstringsy_clip db 00
+_printstringsy_clip db  00
 * lda #MainMenuStrs
 * ldy #>MainMenuStrs
 * ldx #05 ; horiz pos
-SetYClip          sta _printstringsy_clip
+SetYClip          sta   _printstringsy_clip
                   rts
-PrintStringsXYClip     stx   _printstringsx_horiz
+PrintStringsXYClip stx  _printstringsx_horiz
                   sta   $0
                   sty   $1
-                  stz   $12                    ; y clip
-:loop             
-                  lda   $12 
+                  stz   $12                     ; y clip
+:loop
+                  lda   $12
                   cmp   _printstringsy_clip
                   beq   :done
                   lda   _printstringsx_horiz
@@ -1174,7 +1174,7 @@ PrintStringsXYClip     stx   _printstringsx_horiz
                   ldy   $1
                   jsr   PrintString             ; y is last val
                   inc   text_v                  ; update cursor pos
-                  inc   $12                      ; update y clip
+                  inc   $12                     ; update y clip
                   iny
                   lda   ($0),y
                   beq   :done
@@ -1193,9 +1193,9 @@ Setup80Col        mx    %11
                   jsr   $C300                   ; TURN ON THE VIDEO FIRMWARE
                   rts
 
-DoHelp mx   %00 ; comes from MenuAction
-                  sep  #$30
-                        
+DoHelp            mx    %00                     ; comes from MenuAction
+                  sep   #$30
+
                   jsr   text_clear              ; clear screen
                   stz   text_h                  ; set top left corner (HOME)
                   stz   text_v
@@ -1203,12 +1203,12 @@ DoHelp mx   %00 ; comes from MenuAction
                   lda   #HelpStrs
                   ldy   #>HelpStrs
                   ldx   #00                     ; horiz pos
-                  jsr   PrintStringsX    
-                  jsr   WaitKey                
+                  jsr   PrintStringsX
+                  jsr   WaitKey
 :cleanup          jsr   DrawMenuBackground
                   jmp   DrawNinjaInPlace
-                  
-                  
+
+
 
 DrawMenuBackground mx   %11
 
@@ -1221,14 +1221,14 @@ DrawMenuBackground mx   %11
                   ldx   #00                     ; horiz pos
                   jmp   PrintStringsX           ; implied rts
 
-DrawNinjaBubble mx   %11
+DrawNinjaBubble   mx    %11
                   GOXY  #0;#9
                   lda   #NinjaBubble
                   ldy   #>NinjaBubble
                   ldx   #00                     ; horiz pos
                   jmp   PrintStringsX           ; implied rts
 
-DrawNinjaInPlace  mx %11
+DrawNinjaInPlace  mx    %11
                   ldx   #3
                   ldy   _dnai_y
                   lda   _dnai_y_clip
@@ -1239,11 +1239,11 @@ DrawNinjaLoadEyes mx    %11
                   PRINTSTR NinjaAppleEyesClose
                   rts
 
-DrawNinjaAnimIn   mx %11
-                  lda   #23             ; start position Y
+DrawNinjaAnimIn   mx    %11
+                  lda   #23                     ; start position Y
                   sta   _dnai_y
-                  stz   _dnai_y_clip    ; 0 lines
-                  lda   #15             ; ninja height
+                  stz   _dnai_y_clip            ; 0 lines
+                  lda   #15                     ; ninja height
                   sta   _dnai_y_clip_max
 
 :loop             jsr   WaitVBL
@@ -1252,41 +1252,41 @@ DrawNinjaAnimIn   mx %11
                   ldy   _dnai_y
                   lda   _dnai_y_clip
                   jsr   DrawNinjaXYClip
-                
+
                   jsr   WaitVBL
                   inc   _dnai_y_clip
                   lda   _dnai_y_clip
                   cmp   _dnai_y_clip_max
                   beq   :done
-                  dec   _dnai_y         ; next pass start higher 
-                  bra :loop
-:done             rts 
-_dnai_y          db 0   ; y start
-_dnai_y_clip     db 0   ; current value
-_dnai_y_clip_max db 0   ; done value
+                  dec   _dnai_y                 ; next pass start higher
+                  bra   :loop
+:done             rts
+_dnai_y           db    0                       ; y start
+_dnai_y_clip      db    0                       ; current value
+_dnai_y_clip_max  db    0                       ; done value
 
 
-                  
-TextColorSet      mx %11
-                  lda $c034
-                  sta _bak_bordercolor
-                  lda $c022
-                  sta _bak_textcolor
-                  lda #0
-                  sta $c034
-                  lda #$C0 ; grn black
-                  sta $c022
+
+TextColorSet      mx    %11
+                  lda   $c034
+                  sta   _bak_bordercolor
+                  lda   $c022
+                  sta   _bak_textcolor
+                  lda   #0
+                  sta   $c034
+                  lda   #$C0                    ; grn black
+                  sta   $c022
                   rts
 
-TextColorRestore  mx %11          
-                  lda _bak_bordercolor
-                  sta $c022
-                  lda _bak_textcolor
-                  sta $c034
+TextColorRestore  mx    %11
+                  lda   _bak_bordercolor
+                  sta   $c022
+                  lda   _bak_textcolor
+                  sta   $c034
                   rts
-                  
-_bak_bordercolor ds 1
-_bak_textcolor ds 1
+
+_bak_bordercolor  ds    1
+_bak_textcolor    ds    1
 
 
 
@@ -1333,7 +1333,7 @@ TitleStrs
                   asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
                   asc   'Z',"                             ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',"               ",'_',00
                   asc   'Z',"                                                                             ",'_',00
-                  asc   " ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'," ",00        
+                  asc   " ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'," ",00
                   hex   00,00
 NinjaBubble       asc   'Z',"                                                                             ",'_',00
                   asc   'Z',"                             _________________________________               ",'_',00
@@ -1363,16 +1363,16 @@ NinjaStrs         asc   "                        ",00
                   asc   "      \ (        :      ",00
                   asc   " __.---``         `--._ ",00
                   asc   "/                      \",00
-                  hex   00,00,00,00,00,00   ; not needed
+                  hex   00,00,00,00,00,00       ; not needed
 NinjaAppleEyesClose asc '@',"     ",'@',00
-NinjaAngryBrows asc   "   _.:'|   ,-\---/--|   ",00,00,00
-                 mx %11
+NinjaAngryBrows   asc   "   _.:'|   ,-\---/--|   ",00,00,00
+                  mx    %11
 ; x = x, y=y, clip = ylines to draw before stopping
-DrawNinjaXYClip   jsr SetYClip ; with A value
-                  sty text_v                                  ; works
-                  lda #NinjaStrs
-                  ldy #>NinjaStrs
-                  jsr PrintStringsXYClip
+DrawNinjaXYClip   jsr   SetYClip                ; with A value
+                  sty   text_v                  ; works
+                  lda   #NinjaStrs
+                  ldy   #>NinjaStrs
+                  jsr   PrintStringsXYClip
                   rts
 
 
@@ -1397,8 +1397,8 @@ NowPlayingStrs    asc   'Z',"                                Now Playing:       
 DirListMaxEntries =     256
 DirListEntrySize  =     20                      ; 16 name + 1 type + 3 len
 DirList           ds    #DirListEntrySize*DirListMaxEntries
-WaitKeyColor      mx %11
-                  inc $c034
+WaitKeyColor      mx    %11
+                  inc   $c034
 WaitKey           mx    %11
 :nope             lda   KEY
                   bpl   :nope
