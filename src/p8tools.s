@@ -1,13 +1,23 @@
+** No Allocation mode... maybe not safe
+* P8_OPEN_BUFFER    =     $800                    ; @todo: allocate  ..  buffer for open file being accessed
+* P8_DATA_BUFFER    =     $D00                    ; @todo: allocate  ..  buffer for file read data
+* P8_DATA_BUFFER_SZ =     $1000                   ;
+* PT_PREFIX_BUFFER  =     $1D00                   ; 256 byte area
+
+** Inline Allocation... slower loading, maybe should figure out bank 00 allocation
+                  ds \
+P8_OPEN_BUFFER    ds $400                    ; @todo: allocate  ..  buffer for open file being accessed
+P8_DATA_BUFFER    ds P8_DATA_BUFFER_SZ                    ; @todo: allocate  ..  buffer for file read data
+P8_DATA_BUFFER_SZ =  $1000                   
+PT_PREFIX_BUFFER  ds $100                       ; 256 byte area
+
+
 P8_MLI_CALL       =     $bf00
-P8_OPEN_BUFFER    =     $800                    ; @todo: allocate  ..  buffer for open file being accessed
-P8_DATA_BUFFER    =     $D00                    ; @todo: allocate  ..  buffer for file read data
-P8_DATA_BUFFER_SZ =     $1000                   ;
 PT_DST_PTR        =     $00                     ; DP location used for copies
 PT_TMP_PTR        =     $04                     ; Use for internal routines like string handling
 PT_DIR_ENTRY_PTR  =     $08                     ; point to current entry when scanning a directory
 P8_ERR_BUF_IN_USE =     #$56                    ; when the specified buffer is marked in-use by Prodos system table
 P8_ERR_EOF        =     #$4C                    ; hit End Of File (or directory)
-PT_PREFIX_BUFFER  =     $1D00                   ; 256 byte area
 
 P8_CROUT          =     $FC62
 P8_CROUT2         =     $FD8E

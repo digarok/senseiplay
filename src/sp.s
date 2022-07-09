@@ -16,58 +16,23 @@
 * not at: https://prodos8.com/docs/techref/quick-reference-card/
 
 
-KEY               equ   $C000
-STROBE            equ   $C010
-
-
-****
-*   PrepareTools
-*   LoadFile 'ntpplayer';0    ; bank aligned
-*   - get ^^ filesize
-*   - dynamically alloc ram   ; nice errors here plz
-*   - load a file
-*   init buffers et al
-*   show program screen
-*   do file handler
-*     get current dir
-*     set list offset index (to zero/first file)
-*     set file selected index (to zero/first file)
-*     draw list with highlights
-*     handle keys
-*   onplay
-*     Load
-*     - play
-*     - update vus (if on?)
-*     - update/draw note data (if on?)
-*     - handle keys
-*
-
-*load mod
-* take the filename -> get filesize
-* allocate ram, contiguous  (also destroy any previous ram)
-
-
 
                   org   $2000                   ; start at $2000 (all ProDOS8 system files)
                   typ   $ff
                   mx    %11
 
-                  jsr   InitTextTools
+                  jsr   InitTextTools           
+                  jsr   SetGSText
                   jsr   Setup80Col
-
+                  
+                  jsr   TextColorInit
                   jsr   TextColorSet
                   jsr   DrawMenuBackground
                   jsr   DrawNinjaAnimIn
 
-                                                ; jsr   P8CALL_GET_PREFIX
-                                                ; lda   P8BUFF_PREFIXPATH
-                                                ; jsr   P8CALL_ONLINE
-                                                ; lda   P8BUFF_DRIVES_ONLINE
-                                                ; jsr   DirTest
                   clc
                   xce
                   rep   #$30
-
 
                   jsr   PrepareTools
                   jsr   PrepareNTP
@@ -261,12 +226,6 @@ DirectoryRenderItem mx  %00
                   lda   #" "
                   jsr   COOT8
 
-
-*    jsr HEX24TODEC8
-*    jsr DEC8TOCHAR10R
-*    lda CHAR10
-
-
                   rep   #$30
                   rts
 _sl_char_count    dw    0                       ; used for width checking strings
@@ -289,6 +248,7 @@ MenuLoop          clc
 
 :key_handling
                   sep   #$30
+                  jsr   TextColorSet            ; I just call this regularly during the menu in case they go into CPanel
 
                   lda   KEY
                   bpl   MenuLoop
@@ -634,7 +594,13 @@ MenuActions       db    #'w'
 
                   db    #'q'                     ; quit
                   db    #'Q'
-                  db    $1b                     ; esc
+                  ;db    $1b                     ; esc
+
+                  db    #'c'
+                  db    #'C'
+                  db    #'b'
+                  db    #'B'
+
                   db    #'?'
 MenuActionsCount  =     *-MenuActions
 
@@ -650,7 +616,13 @@ MenuRoutines      da    SL_DecSelected
 
                   da    QuitRoutine
                   da    QuitRoutine
-                  da    QuitRoutine
+                  ;da    QuitRoutine
+
+                  da    DoColor
+                  da    DoColor
+                  da    DoBGColor
+                  da    DoBGColor
+                           
 
                   da    DoHelp
 
@@ -1087,111 +1059,34 @@ FUNHALT           MAC
                   <<<
 
 
-
-
-
-GOXY              MAC
-                  ldx   ]1
-                  ldy   ]2
-                  stx   text_h
-                  sty   text_v
-                  <<<
-
-PRINTSTR          MAC
-                  lda   #]1
-                  ldy   #>]1
-                  jsr   PrintString
-                  <<<
-
-
-
-* PrintString (A=Low Byte,  Y=High Byte)
-PrintString       mx    %11
-                  sta   :loop+1
-                  sty   :loop+2
-
+DoColor           mx    %00
+                  sep   #$30
+                  lda   _cur_textcolor
                   clc
-                  xce
-
-                  ldy   #0
-:loop             lda   $FFFF,y                 ; dummy bytes
-                  beq   :done
-                  jsr   COOT8
-                  iny
-
-                  bra   :loop
-:done             rts
-
-
-BigNum            MAC
-                  lda   #]2+{]1*$100}           ; multiply low byte by 256 and add high byte
-                  <<<
-* lda #MainMenuStrs
-* ldy #>MainMenuStrs
-* ldx #05 ; horiz pos
-PrintStringsX     mx    %11
-                  stx   _printstringsx_horiz
-
-                  sta   $0
-                  sty   $1
-:loop             lda   _printstringsx_horiz
-                  sta   text_h
-                  lda   $0                      ; slower, but allows API reuse
-                  ldy   $1
-                  jsr   PrintString             ; y is last val
-                  inc   text_v                  ; update cursor pos
-                  iny
-                  lda   ($0),y
-                  beq   :done
-                  tya                           ; not done so add strlen to source ptr
-                  clc
-                  adc   $0
-                  sta   $0
-                  bcc   :nocarry
-                  inc   $1
-:nocarry          bra   :loop
-
-:done             rts
-
-_printstringsx_horiz db 00
-_printstringsy_clip db  00
-* lda #MainMenuStrs
-* ldy #>MainMenuStrs
-* ldx #05 ; horiz pos
-SetYClip          sta   _printstringsy_clip
+                  adc #$10
+                  and #$F0
+:store            ora   _cur_bordercolor  ; pick up bg color
+                  sta   _cur_textcolor  
+                                        
+                  rep   #$30
                   rts
-PrintStringsXYClip stx  _printstringsx_horiz
-                  sta   $0
-                  sty   $1
-                  stz   $12                     ; y clip
-:loop
-                  lda   $12
-                  cmp   _printstringsy_clip
-                  beq   :done
-                  lda   _printstringsx_horiz
-                  sta   text_h
-                  lda   $0                      ; slower, but allows API reuse
-                  ldy   $1
-                  jsr   PrintString             ; y is last val
-                  inc   text_v                  ; update cursor pos
-                  inc   $12                     ; update y clip
-                  iny
-                  lda   ($0),y
-                  beq   :done
-                  tya                           ; not done so add strlen to source ptr
-                  clc
-                  adc   $0
-                  sta   $0
-                  bcc   :nocarry
-                  inc   $1
-:nocarry          bra   :loop
 
-:done             rts
-
-Setup80Col        mx    %11
-                  lda   #$A0                    ; USE A BLANK SPACE TO
-                  jsr   $C300                   ; TURN ON THE VIDEO FIRMWARE
+DoBGColor         mx    %00
+                  sep   #$30
+                  lda   _cur_bordercolor
+                  inc 
+                  cmp #$10
+                  bne :store
+                  lda #0
+:store          sta   _cur_bordercolor  
+                lda _cur_textcolor
+                and #$F0
+                  ora   _cur_bordercolor  ; pick up bg color
+                  sta   _cur_textcolor  
+                                        
+                  rep   #$30
                   rts
+
 
 DoHelp            mx    %00                     ; comes from MenuAction
                   sep   #$30
@@ -1267,16 +1162,24 @@ _dnai_y_clip_max  db    0                       ; done value
 
 
 
-TextColorSet      mx    %11
+TextColorInit     mx    %11
                   lda   $c034
                   sta   _bak_bordercolor
                   lda   $c022
                   sta   _bak_textcolor
                   lda   #0
-                  sta   $c034
+                  sta   _cur_bordercolor
                   lda   #$C0                    ; grn black
-                  sta   $c022
+                  sta   _cur_textcolor
                   rts
+
+TextColorSet      mx    %11
+                  lda   _cur_bordercolor
+                  sta $c034
+                  lda   _cur_textcolor
+                  sta $c022
+                  rts
+                
 
 TextColorRestore  mx    %11
                   lda   _bak_bordercolor
@@ -1287,6 +1190,8 @@ TextColorRestore  mx    %11
 
 _bak_bordercolor  ds    1
 _bak_textcolor    ds    1
+_cur_bordercolor  ds    1
+_cur_textcolor    ds    1
 
 
 
@@ -1404,6 +1309,10 @@ WaitKey           mx    %11
                   bpl   :nope
                   sta   STROBE
                   rts
+KEY               equ   $C000
+STROBE            equ   $C010
+
+
 
 
                   put   p8tools

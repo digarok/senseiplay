@@ -248,3 +248,118 @@ _DIGIT            db    0
 HEX24             ADR   $ffffff                 ; $123456              ;1,193,046
 DEC8              DS    4                       ; 8 digits of BCD
 CHAR10            DS    10
+
+
+
+
+
+
+
+
+GOXY              MAC
+                  ldx   ]1
+                  ldy   ]2
+                  stx   text_h
+                  sty   text_v
+                  <<<
+
+PRINTSTR          MAC
+                  lda   #]1
+                  ldy   #>]1
+                  jsr   PrintString
+                  <<<
+
+
+
+* PrintString (A=Low Byte,  Y=High Byte)
+PrintString       mx    %11
+                  sta   :loop+1
+                  sty   :loop+2
+
+                  clc
+                  xce
+
+                  ldy   #0
+:loop             lda   $FFFF,y                 ; dummy bytes
+                  beq   :done
+                  jsr   COOT8
+                  iny
+
+                  bra   :loop
+:done             rts
+
+
+BigNum            MAC
+                  lda   #]2+{]1*$100}           ; multiply low byte by 256 and add high byte
+                  <<<
+* lda #MainMenuStrs
+* ldy #>MainMenuStrs
+* ldx #05 ; horiz pos
+PrintStringsX     mx    %11
+                  stx   _printstringsx_horiz
+
+                  sta   $0
+                  sty   $1
+:loop             lda   _printstringsx_horiz
+                  sta   text_h
+                  lda   $0                      ; slower, but allows API reuse
+                  ldy   $1
+                  jsr   PrintString             ; y is last val
+                  inc   text_v                  ; update cursor pos
+                  iny
+                  lda   ($0),y
+                  beq   :done
+                  tya                           ; not done so add strlen to source ptr
+                  clc
+                  adc   $0
+                  sta   $0
+                  bcc   :nocarry
+                  inc   $1
+:nocarry          bra   :loop
+
+:done             rts
+
+_printstringsx_horiz db 00
+_printstringsy_clip db  00
+* lda #MainMenuStrs
+* ldy #>MainMenuStrs
+* ldx #05 ; horiz pos
+SetYClip          sta   _printstringsy_clip
+                  rts
+PrintStringsXYClip stx  _printstringsx_horiz
+                  sta   $0
+                  sty   $1
+                  stz   $12                     ; y clip
+:loop
+                  lda   $12
+                  cmp   _printstringsy_clip
+                  beq   :done
+                  lda   _printstringsx_horiz
+                  sta   text_h
+                  lda   $0                      ; slower, but allows API reuse
+                  ldy   $1
+                  jsr   PrintString             ; y is last val
+                  inc   text_v                  ; update cursor pos
+                  inc   $12                     ; update y clip
+                  iny
+                  lda   ($0),y
+                  beq   :done
+                  tya                           ; not done so add strlen to source ptr
+                  clc
+                  adc   $0
+                  sta   $0
+                  bcc   :nocarry
+                  inc   $1
+:nocarry          bra   :loop
+
+:done             rts
+
+SetGSText         mx %11
+                  lda #0
+                  stal $00c029
+                  rts
+
+Setup80Col        mx    %11
+                  lda   #$A0                    ; USE A BLANK SPACE TO
+                  jsr   $C300                   ; TURN ON THE VIDEO FIRMWARE
+                  rts
