@@ -355,7 +355,7 @@ PrintStringsXYClip  stx   _printstringsx_horiz
 :done               rts
 
 SetGSText           mx    %11
-                    lda   #0
+                    lda   #01
                     stal  $00c029
                     rts
 

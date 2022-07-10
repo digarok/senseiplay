@@ -316,11 +316,10 @@ ShowVUs             clc
                     lda   [0]                   ; number of tracks
                     tax                         ; counter
                     ldy   #2                    ; index of first track
-:vu_loop            lda   [0],y
-                    jsr   RenderVU
+:vu_loop
                     lda   [0],y
                     jsr   RenderVUBar
-                    lda   [0],y
+
                     jsr   RenderVUVals
                     iny
                     iny
@@ -328,60 +327,6 @@ ShowVUs             clc
                     bne   :vu_loop
                     rts
 
-
-* y = (vu number*2)+2   a = value
-RenderVUVals        mx    %00
-
-                    phx
-                    phy
-                    sep   $30
-
-                    tya
-                    pha
-                    asl                         ; now *4
-                    clc
-                    adc   VUBarX                ; add offset
-                    sta   8
-                    GOXY  8;VUBarY+7
-                    plx
-                    dex
-                    dex
-
-                    lda   VUBarValues,x
-                    jsr   PrHex
-
-                    clc
-                    xce
-                    rep   $30
-
-                    ply
-                    plx
-                    rts
-
-* y = (vu number*2)+2   a = value
-RenderVU            mx    %00
-
-                    phx
-                    phy
-                    sep   $30
-                    pha
-                    tya
-                    asl                         ; now *4
-                    clc
-                    adc   VUBarX                ; add offset
-                    sta   8
-                    GOXY  8;VUBarY+6
-
-                    pla
-                    jsr   PrHex
-
-                    clc
-                    xce
-                    rep   $30
-
-                    ply
-                    plx
-                    rts
 
 
 ShowTrackPos        clc
@@ -545,39 +490,10 @@ PlayerUi            mx    %00                   ; @todo: this is a mess
 :set_vu_x_offset    lda   [0]                   ; number of tracks
                     sta   VUBarCount
                     tax
+                    jsr   SetVUBarWidth         ; x is preserved
+                    jsr   SetVUBarOffset
 
-                    lda   #34                   ; midpoint, eh?
-:to_tha_left        dex
-                    beq   :vu_offset_complete
-                    sec
-                    sbc   #2
-                    cmp   #3
-                    bcc   :vu_offset_complete   ; cant go left-er
-                    bra   :to_tha_left
-
-*                   cmp   #$4+1                   ;  set x offset based on how many tracks  (<=4), (<=8), (>8)
-*                   bcs   :over_4
-* :4_or_fewer       lda   #27
-*                   sta   VUBarX
-*                   bra   :vu_offset_complete
-* :over_4           cmp   #$8+1
-*                   bcs   :over_8
-* :5_to_8           lda   #20
-*                   sta   VUBarX
-*                   bra   :vu_offset_complete
-* :over_8
-*                   lda   #6
-*                   sta   VUBarX
-
-
-
-
-
-
-
-:vu_offset_complete sta   VUBarX
-
-:render_vu_boxes    jsr   RenderVUBoxes
+                    jsr   RenderVUBoxes
 
                     rts
 
@@ -1091,15 +1007,26 @@ DoBGColor           mx    %00
 DoHelp              mx    %00                   ; comes from MenuAction
                     sep   #$30
 
-                    jsr   text_clear            ; clear screen
-                    stz   text_h                ; set top left corner (HOME)
-                    stz   text_v
-
-                    lda   #HelpStrs
-                    ldy   #>HelpStrs
-                    ldx   #00                   ; horiz pos
+                    jsr   DrawNinjaBubble
+                    jsr   DrawNinjaInPlace
+                    GOXY  #32;#11
+                    lda   #HelpStr0
+                    ldy   #>HelpStr0
+                    ldx   #32                   ; horiz pos
                     jsr   PrintStringsX
                     jsr   WaitKey
+
+
+
+                    jsr   DrawNinjaBubble
+                    jsr   DrawNinjaInPlace
+                    GOXY  #32;#11
+                    lda   #ThankStr0
+                    ldy   #>ThankStr0
+                    ldx   #32                   ; horiz pos
+                    jsr   PrintStringsX
+                    jsr   WaitKey
+
 :cleanup            jsr   DrawMenuBackground
                     jmp   DrawNinjaInPlace
 
@@ -1210,13 +1137,31 @@ IcoVolString        asc   'Z^'," ",$00
 IcoNoString         asc   "   ",$00
 CantPlayFileString  asc   "Can't play this file!@#!",$00,$00,$00
 LoadingFileString   asc   "Loading ",$00,$00,$00
-HelpStrs            asc   "   Press Q to quit.   ",00
+
+HelpStr0            asc   'J'," ",'K'," Use arrows to navigate.",00
+HelpStr1            asc   "  ",'M'," Press Return to play song",'I',00
+                    asc   "          or enter directory.",00
                     asc   " ",00
-                    asc   "                ;)",00,00,00
+HelpStr2            asc   " 'C' = Change 'C'olor ",00
+HelpStr3            asc   " 'B' = Change 'B'ackground",00
+HelpStr4            asc   " 'Q' = 'Q'uit",00
+                    hex   00,00
+
+ThankStr0           asc   "   ",'@A@',"  Thanks!!! ",'@A@',00
+                    asc   " ",00
+                    asc   " ",'ZGGG_',"   Jesse Blue   ",'ZGGG_',00
+                    asc   " ",'ZGGG_',"    J.Craft     ",'ZGGG_',00
+                    asc   " ",'ZGGG_',"    DWSJason    ",'ZGGG_',00
+                    asc   " ",'ZGGG_',"     FatDog     ",'ZGGG_',00
+                    asc   " ",'ZGGG_'," Antoine Vignau ",'ZGGG_',00
+                    hex   00,00
+
+
+
 
 TitleStrs
                     asc   " _____________________________________________________________________________",00
-                    asc   'ZV_@'," v0.0.3",'ZVWVWVWVWVWVWVWVWVWVWVW_',"Ninjaforce",'ZVWVWVWVWVWVWVWVWV_',"][ infinitum",'ZW_',00
+                    asc   'ZV_@'," v0.1.1",'ZVWVWVWVWVWVWVWVWVWVWVW_',"Ninjaforce",'ZVWVWVWVWVWVWVWVWV_',"][ infinitum",'ZW_',00
                     asc   'ZLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL_',00
                     asc   'Z',"    _____                                _     ____     __                   ",'_',00
                     asc   'Z',"   / ___/  ___    ____    _____  ___    (_)   / __ \   / /  ____ _   __  __  ",'_',00
@@ -1236,12 +1181,14 @@ TitleStrs
                     asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
                     asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
                     asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                             ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',"               ",'_',00
+                    asc   'Z',"                             ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',"     ? - help  ",'_',00
                     asc   'Z',"                                                                             ",'_',00
                     asc   " ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'," ",00
                     hex   00,00
-NinjaBubble         asc   'Z',"                                                                             ",'_',00
-                    asc   'Z',"                             _________________________________               ",'_',00
+NinjaBubble         asc   'Z',"                             _________________________________               ",'_',00
+                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
+                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
+                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
                     asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
                     asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
                     asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
@@ -1249,8 +1196,6 @@ NinjaBubble         asc   'Z',"                                                 
                     asc   'Z',"                           /                                  ",'_',"              ",'_',00
                     asc   'Z',"                          /                                   ",'_',"              ",'_',00
                     asc   'Z',"                          ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',"               ",'_',00
-                    asc   'Z',"                                                                             ",'_',00
-                    asc   'Z',"                                                                             ",'_',00
                     asc   'Z',"                                                                             ",'_',00
                     asc   'Z',"                                                                             ",'_',00
                     hex   00,00
