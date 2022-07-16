@@ -20,13 +20,17 @@
                     org   $2000                 ; start at $2000 (all ProDOS8 system files)
                     typ   $ff
                     mx    %11
-
+                    jsr   SaveTextColors
                     jsr   InitTextTools
                     jsr   SetGSText
                     jsr   Setup80Col
 
+                    jsr   DrawSplash
+                                                ;jsr   WaitKey
+
                     jsr   TextColorInit
                     jsr   TextColorSet
+
                     jsr   DrawMenuBackground
                     jsr   DrawNinjaAnimIn
 
@@ -261,7 +265,8 @@ MenuLoop            clc
                     inx
                     cpx   #MenuActionsCount
                     bne   :find_key
-                    bra   :debug
+                    bra   MenuLoop
+                                                ;bra   :debug
 
 :found_key          rep   $30
                     txa
@@ -271,17 +276,16 @@ MenuLoop            clc
                     lda   MenuRoutines,y
                     sta   :jump+1
 
-
 :jump               jsr   $0000                 ; SMC
                     bra   MenuLoop
 
-:debug              sep   #$30                  ;
-                    pha                         ; hex debug
-                    GOXY  #75;#22               ;
-                    pla                         ;
-                    jsr   PrHex
+* :debug              sep   #$30                  ;
+*                     pha                         ; hex debug
+*                     GOXY  #75;#22               ;
+*                     pla                         ;
+*                     jsr   PrHex
 
-                    bra   MenuLoop
+*                     bra   MenuLoop
 ******************************************************************  <<<<<<<<<<<<<<
 
 
@@ -340,7 +344,7 @@ ShowTrackPos        clc
 
                                                 ; bg area pre-drawn at start
                     GOXY  #36;#1                ; cursor
-                    ldy   #7                    ; pat
+                    ldy   #4                    ; pat
                     lda   [0],y
                     jsr   PrHex
                     GOXY  #46;#1                ; cursor
@@ -446,42 +450,76 @@ MenuEnterSelected   mx    %00
                     jsr   SaveDP
                     jsr   LoadNTP
                     jsr   RestoreDP
-                    jsr   StartMusic
+                    jsr   StartMusic            ; seems to return mx=11
                     bcs   :err
+                    clc
+                    xce
+                    rep   #$30
+                    jsr   ParseSongInfo
                     jsr   PlayerUi
                     jsr   PlayerLoop
 :err
                     jsr   UnloadNTP
                     rts
-PlayerUi            mx    %00                   ; @todo: this is a mess
-                    sep   $30
-                    GOXY  #30;#1                ; title pat/pos (in title bar)
-                    PRINTSTR PatPosString
 
-                    GOXY  #0;VUBarY-4
-                    lda   #NowPlayingStrs       ; now playing and clear file widget
-                    ldy   #>NowPlayingStrs
-                    ldx   #00                   ; horiz pos
-                    jsr   PrintStringsX
+
+
+NTPFileVerStr       asc   "NTP File Version: "
+NTPFileVerByte      asc   " ",00
+NTPFileVer          db    0                     ; actual value in case we need to branch on this
+NTPNumTracks        db    0
+NTPNumInst          db    0
+NTPNumPatt          db    0
+NTPLenPatt          db    0
+
+ParseSongInfo       mx    %00
+
+                    jsr   SetModZPPtr           ;NEW
+
+                    sep   $30                   ; NEW
+                    ldy   #4
+                    ldal  [ModZPPtr],Y
+                    sta   NTPFileVer
+                    clc
+                    adc   #"0"
+                    sta   NTPFileVerByte
+                    iny
+                    ldal  [ModZPPtr],Y
+                    sta   NTPNumTracks
+                    ldal  [ModZPPtr],Y
+                    sta   NTPNumInst
+                    ldal  [ModZPPtr],Y
+                    sta   NTPNumPatt
+                    ldal  [ModZPPtr],Y
+                    sta   NTPLenPatt
+
+                    rts
+PlayerUi            mx    %00                   ; @todo: this is a mess
+                    sep   #$30
+
+                    jsr   DrawMenuBackgroundBox
+                    PRINTSTRSXY #3;#3;SenseiLogoStrs
+                    PRINTSTRXY #30;#1;PatPosString ; title pat/pos (in title bar)
+                    PRINTSTRSXY #30;VUBarY-4;NowPlayingStrs
+                    PRINTSTRXY #58;#22;NTPFileVerStr ; file version
 
                     clc
                     xce
-                    rep   $30
+                    rep   #$30
+
+
+
+
                     jsr   SL_GetSelected        ; print name
                     tax
                     jsr   SetPtr0toDirEntry
 
                     sep   $30
                     GOXY  #32;VUBarY-2
-
-                    clc
-                    xce
                     rep   $30
 
                     lda   $0
-
                     >>>   PT_PrintProdosStr
-
                     jsr   _NTPgetvuptr
 
                     stx   0
@@ -492,9 +530,7 @@ PlayerUi            mx    %00                   ; @todo: this is a mess
                     tax
                     jsr   SetVUBarWidth         ; x is preserved
                     jsr   SetVUBarOffset
-
                     jsr   RenderVUBoxes
-
                     rts
 
 
@@ -510,11 +546,10 @@ MenuActions         db    #'w'
 
                     db    #'q'                   ; quit
                     db    #'Q'
-                                                ;db    $1b                     ; esc
 
-                    db    #'c'
+                    db    #'c'                   ; color
                     db    #'C'
-                    db    #'b'
+                    db    #'b'                   ; background
                     db    #'B'
 
                     db    #'?'
@@ -541,8 +576,6 @@ MenuRoutines        da    SL_DecSelected
 
 
                     da    DoHelp
-
-
 
 _DPBAK              ds    256
 SaveDP              clc
@@ -621,14 +654,22 @@ LoadNTP             mx    %11
                     sta   $0a
                     ldy   #0
                     ldal  [$8],Y
-                    sta   $04
                     sta   BnkMODPtr             ; save for easy access
                     ldy   #2
                     ldal  [$8],Y
-                    sta   $06
                     sta   BnkMODPtr+2
-                    PT_LoadFilePtrToPtr 0;4     ; and load file into allocated RAM
+                    jsr   SetModZPPtr           ; slower but consistent
+                    PT_LoadFilePtrToPtr 0;ModZPPtr ; and load file into allocated RAM
                     rts
+
+ModZPPtr            =     $14                   ; long ptr to mod data
+SetModZPPtr         mx    %00
+                    lda   BnkMODPtr
+                    sta   ModZPPtr
+                    lda   BnkMODPtr+2
+                    sta   ModZPPtr+2
+                    rts
+
 
 
 StartMusic          mx    %00
@@ -648,40 +689,19 @@ StartMusic          mx    %00
                     clc
                     rts
 
-
 HoldUp              mx    %00
                     sep   $30
+                    jsr   DrawOnlyNinjaBackground
                     jsr   DrawNinjaBubble
-                    jsr   DrawNinjaInPlace
-                    GOXY  #36;#13
-                    lda   #CantPlayFileString
-                    ldy   #>CantPlayFileString
-                    ldx   #36                   ; horiz pos
-                    jsr   PrintStringsX
+                    PRINTSTRXY #36;#13;CantPlayFileString
+                    PRINTSTRXY #3;#14;NinjaAngryBrows
 
+                    jsr   BorderCops            ; <- anim delay
 
-                    GOXY  #3;#14
-                    lda   #NinjaAngryBrows
-                    ldy   #>NinjaAngryBrows
-
-                    ldx   #3                    ; horiz pos
-                    jsr   PrintStringsX
-
-
-
-                    lda   $c034
-                    pha
-
-**** NEW routine
-                    jsr   BorderCops
-                    pla
-                    sta   $c034
-
+                    jsr   TextColorSet
 :cleanup            jsr   DrawMenuBackground
                     jsr   DrawNinjaInPlace
                     rts
-*** END routine
-
 
 ColorSeq            db    $00
                     db    01
@@ -952,29 +972,6 @@ NTPforcesongpos     =     NinjaTrackerPlus+15   ; tool does not use
 NTPgetsongpos       =     NinjaTrackerPlus+18   ; tool does not use
 
 
-FUNHALT             MAC
-                    sec
-                    xce
-                    sep   #$30
-:loop               lda   $c019
-
-                    bpl   :skip
-                    lda   #$f6
-                    sta   $c022
-:skip               lda   #$db
-;                  jsr   PrHex
-
-                    lda   $c022
-                    clc
-                    adc   #$10
-                    sta   $c022
-                    lda   #$FF
-:delay              dec
-                    bne   :delay
-                    bra   :loop
-                    <<<
-
-
 DoColor             mx    %00
                     sep   #$30
                     lda   _cur_textcolor
@@ -1006,49 +1003,117 @@ DoBGColor           mx    %00
 
 DoHelp              mx    %00                   ; comes from MenuAction
                     sep   #$30
-
+                    jsr   DrawOnlyNinjaBackground
                     jsr   DrawNinjaBubble
-                    jsr   DrawNinjaInPlace
-                    GOXY  #32;#11
-                    lda   #HelpStr0
-                    ldy   #>HelpStr0
-                    ldx   #32                   ; horiz pos
-                    jsr   PrintStringsX
+                    PRINTSTRSXY #33;#10;HelpStr0
                     jsr   WaitKey
-
-
-
                     jsr   DrawNinjaBubble
-                    jsr   DrawNinjaInPlace
-                    GOXY  #32;#11
-                    lda   #ThankStr0
-                    ldy   #>ThankStr0
-                    ldx   #32                   ; horiz pos
-                    jsr   PrintStringsX
+                    PRINTSTRSXY #36;#10;ThankStr0
                     jsr   WaitKey
 
 :cleanup            jsr   DrawMenuBackground
                     jmp   DrawNinjaInPlace
 
-
+DrawOnlyNinjaBackground mx %11
+                    jsr   DrawMenuBackgroundBox
+                    PRINTSTRSXY #3;#3;SenseiLogoStrs
+                    jmp   DrawNinjaInPlace
 
 DrawMenuBackground  mx    %11
+                    jsr   DrawMenuBackgroundBox
+                    PRINTSTRSXY #3;#3;SenseiLogoStrs
+                    PRINTSTRXY #38;#9;ChooseTrackStr
+                    PRINTSTRSXY #29;#10;TrackBoxStrs
+                    PRINTSTRXY #68;#21;HelpStr
+                    rts
 
-                    jsr   text_clear            ; clear screen
+DrawMenuBackgroundBox mx  %11
+;                  jsr   text_clear            ; clear screen  <- don't need because we are wall-to-wall :P
                     stz   text_h                ; set top left corner (HOME)
                     stz   text_v
-
-                    lda   #TitleStrs
-                    ldy   #>TitleStrs
+                    lda   #MenuTopStrs
+                    ldy   #>MenuTopStrs
                     ldx   #00                   ; horiz pos
-                    jmp   PrintStringsX         ; implied rts
+                    jsr   PrintStringsX         ; implied rts
+                    PRINTSTRXLUP #0;#3;#20;MenuMidStr
+                    PRINTSTRXY #0;#23;MenuBotStr
+                    rts
+
+DrawSplash          mx    %11
+                    jsr   text_clear            ; clear screen
+                    stz   $c034
+                    stz   $c022
+                    PRINTSTRSXY #8;#1;LogoStrs
+                    ldx   #$10
+                    jsr   FadeDelay
+                    PRINTSTRSXY #7;#2;LogoStrs
+                    lda   #$50                  ; G
+                    jsr   SetColorDelay2
+                    PRINTSTRSXY #7;#3;LogoStrs
+                    lda   #$10                  ; R
+                    jsr   SetColorDelay2
+                    PRINTSTRSXY #6;#4;LogoStrs
+                    lda   #$90                  ; O
+                    jsr   SetColorDelay2
+                    PRINTSTRSXY #6;#5;LogoStrs
+                    lda   #$D0                  ; Y
+                    jsr   SetColorDelay2
+                    PRINTSTRSXY #5;#6;LogoStrs
+                    lda   #$F0
+                    jsr   SetColorDelay2
+                    ldx   #$80
+                    jsr   FadeDelay
+                    jsr   WipeSplash
+                    rts
+WipeSplash          mx    %11
+                    PRINTSTRSXY #4;#7;LogoStrs
+                    lda   #$F0
+                    jsr   SetColorDelay2
+                    PRINTSTRSXY #3;#8;LogoStrs
+                    lda   #$D0                  ; Y
+                    jsr   SetColorDelay2
+                    PRINTSTRSXY #3;#9;LogoStrs
+                    lda   #$D0                  ; Y
+                    jsr   SetColorDelay2
+                    PRINTSTRSXY #2;#10;LogoStrs
+                    lda   #$90                  ; Y
+                    jsr   SetColorDelay2
+                    PRINTSTRSXY #2;#11;LogoStrs
+                    lda   #$90                  ; Y
+                    jsr   SetColorDelay2
+                    PRINTSTRSXY #1;#12;LogoStrs
+                    lda   #$10                  ; Y
+                    jsr   SetColorDelay2
+                    PRINTSTRSXY #1;#13;LogoStrs
+                    lda   #$10                  ; Y
+                    jsr   SetColorDelay2
+                    PRINTSTRSXY #0;#14;LogoStrs
+                    lda   #$50                  ; Y
+                    jsr   SetColorDelay2
+                    PRINTSTRSXY #0;#15;LogoStrs
+                    lda   #$50                  ; Y
+                    jsr   SetColorDelay2
+                    stz   $c022
+
+                    rts
+
+* a=color
+SetColorDelay       sta   $c022
+                    ldx   #$04
+                    jmp   FadeDelay
+SetColorDelay2      sta   $c022
+                    ldx   #$02
+                    jmp   FadeDelay
+* x=delay
+FadeDelay           mx    %11
+:loop               jsr   WaitVBL
+                    dex
+                    bne   :loop
+                    rts
 
 DrawNinjaBubble     mx    %11
-                    GOXY  #0;#9
-                    lda   #NinjaBubble
-                    ldy   #>NinjaBubble
-                    ldx   #00                   ; horiz pos
-                    jmp   PrintStringsX         ; implied rts
+                    PRINTSTRSXY #27;#8;NinjaBubble
+                    rts
 
 DrawNinjaInPlace    mx    %11
                     ldx   #3
@@ -1057,8 +1122,7 @@ DrawNinjaInPlace    mx    %11
                     jmp   DrawNinjaXYClip
 
 DrawNinjaLoadEyes   mx    %11
-                    GOXY  #15;#15
-                    PRINTSTR NinjaAppleEyesClose
+                    PRINTSTRXY #15;#15;NinjaAppleEyesClose
                     rts
 
 DrawNinjaAnimIn     mx    %11
@@ -1088,12 +1152,14 @@ _dnai_y_clip        db    0                     ; current value
 _dnai_y_clip_max    db    0                     ; done value
 
 
-
-TextColorInit       mx    %11
+SaveTextColors      mx    %11
                     lda   $c034
                     sta   _bak_bordercolor
                     lda   $c022
                     sta   _bak_textcolor
+                    rts
+
+TextColorInit       mx    %11
                     lda   #0
                     sta   _cur_bordercolor
                     lda   #$C0                  ; grn black
@@ -1124,10 +1190,8 @@ _cur_textcolor      ds    1
 
 
 PrefixSlashStr      str   '/'
-TestStr             str   'Hello all'
 
 DirListCount        dw    0
-
 
 MouseString         asc   '@ABCDEFGHIJKLMNOPQRSTUVWXYZXYXY[\]^_',00
 PatPosString        asc   '_',"Pat:    ",'C'," Pos:   ",'Z',00
@@ -1147,58 +1211,69 @@ HelpStr3            asc   " 'B' = Change 'B'ackground",00
 HelpStr4            asc   " 'Q' = 'Q'uit",00
                     hex   00,00
 
-ThankStr0           asc   "   ",'@A@',"  Thanks!!! ",'@A@',00
+ThankStr0           asc   'U'," Written by DiGaRoK ",'H',00
                     asc   " ",00
-                    asc   " ",'ZGGG_',"   Jesse Blue   ",'ZGGG_',00
-                    asc   " ",'ZGGG_',"    J.Craft     ",'ZGGG_',00
-                    asc   " ",'ZGGG_',"    DWSJason    ",'ZGGG_',00
-                    asc   " ",'ZGGG_',"     FatDog     ",'ZGGG_',00
-                    asc   " ",'ZGGG_'," Antoine Vignau ",'ZGGG_',00
-                    hex   00,00
+                    asc   "  ",'@A@',"  Thanks!!! ",'@A@',00
+                    asc   "  ",'[',"   Jesse Blue   ",'[',00
+                    asc   "  ",'[',"    J.Craft     ",'[',00
+                    asc   "  ",'[',"    DWSJason    ",'[',00
+                    asc   "  ",'[',"     FatDog     ",'[',00
+                    asc   "  ",'['," Antoine Vignau ",'[',00
+                    hex   00
 
 
+LogoStrs            asc   "                                                 ",00
+                    asc   "            _              _             ____                            ",00
+                    asc   "   ____    (_)  ____      (_)  ____ _   / __/  ____    _____  _____  ___  ",00
+                    asc   "  / __ \  / /  / __ \    / /  / __ `/  / /_   / __ \  / ___/ / ___/ / _ \ ",00
+                    asc   " / / / / / /  / / / /   / /  / /_/ /  / __/  / /_/ / / /    / /__  /  __/ ",00
+                    asc   "/_/ /_/ /_/  /_/ /_/ __/ /   \__,_/  /_/     \____/ /_/     \___/  \___/ ",00
+                    asc   "                    /___/",00,00
 
 
-TitleStrs
-                    asc   " _____________________________________________________________________________",00
-                    asc   'ZV_@'," v0.1.1",'ZVWVWVWVWVWVWVWVWVWVWVW_',"Ninjaforce",'ZVWVWVWVWVWVWVWVWV_',"][ infinitum",'ZW_',00
-                    asc   'ZLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL_',00
-                    asc   'Z',"    _____                                _     ____     __                   ",'_',00
-                    asc   'Z',"   / ___/  ___    ____    _____  ___    (_)   / __ \   / /  ____ _   __  __  ",'_',00
-                    asc   'Z',"   \__ \  / _ \  / __ \  / ___/ / _ \  / /   / /_/ /  / /  / __ `/  / / / /  ",'_',00
-                    asc   'Z',"  ___/ / /  __/ / / / / (__  ) /  __/ / /   / ____/  / /  / /_/ /  / /_/ /   ",'_',00
-                    asc   'Z'," /____/  \___/ /_/ /_/ /____/  \___/ /_/   /_/      /_/   \__,_/   \__, /    ",'_',00
-                    asc   'Z',"                                                                  /____/     ",'_',00
-                    asc   'Z',"                                     Choose a track:                         ",'_',00
-                    asc   'Z',"                             _________________________________               ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                             ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',"     ? - help  ",'_',00
-                    asc   'Z',"                                                                             ",'_',00
-                    asc   " ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'," ",00
-                    hex   00,00
-NinjaBubble         asc   'Z',"                             _________________________________               ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                            ",'Z',"                                 ",'_',"              ",'_',00
-                    asc   'Z',"                            /                                 ",'_',"              ",'_',00
-                    asc   'Z',"                           /                                  ",'_',"              ",'_',00
-                    asc   'Z',"                          /                                   ",'_',"              ",'_',00
-                    asc   'Z',"                          ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',"               ",'_',00
-                    asc   'Z',"                                                                             ",'_',00
-                    asc   'Z',"                                                                             ",'_',00
-                    hex   00,00
+MenuTopStrs         asc   " ______________________________________________________________________________",00
+                    asc   'ZV_@'," v0.1.2",'ZVWVWVWVWVWVWVWVWVWVWVWV_',"Ninjaforce",'ZVWVWVWVWVWVWVWVWV_',"][ infinitum",'ZW_',00
+                    asc   'ZLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL_',00
+                    hex   00
+MenuMidStr          asc   'Z',"                                                                              ",'_',00
+MenuBotStr          asc   " ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'," ",00
+SenseiLogoStrs      asc   "   _____                                _     ____     __ ",00
+                    asc   "  / ___/  ___    ____    _____  ___    (_)   / __ \   / /  ____ _   __  __ ",00
+                    asc   "  \__ \  / _ \  / __ \  / ___/ / _ \  / /   / /_/ /  / /  / __ `/  / / / / ",00
+                    asc   " ___/ / /  __/ / / / / (__  ) /  __/ / /   / ____/  / /  / /_/ /  / /_/ / ",00
+                    asc   "/____/  \___/ /_/ /_/ /____/  \___/ /_/   /_/      /_/   \__,_/   \__, / ",00
+                    asc   "                                                                 /____/  ",00
+                    hex   00
+
+ChooseTrackStr      asc   "Choose a track:",00
+TrackBoxStrs        asc   " _________________________________",00
+                    asc   'Z',"                                 ",'_',00
+                    asc   'Z',"                                 ",'_',00
+                    asc   'Z',"                                 ",'_',00
+                    asc   'Z',"                                 ",'_',00
+                    asc   'Z',"                                 ",'_',00
+                    asc   'Z',"                                 ",'_',00
+                    asc   'Z',"                                 ",'_',00
+                    asc   'Z',"                                 ",'_',00
+                    asc   'Z',"                                 ",'_',00
+                    asc   'Z',"                                 ",'_',00
+                    asc   " ",,'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',00
+                    hex   00
+HelpStr             asc   "? - help",00
+
+NinjaBubble         asc   "    _________________________________",00
+                    asc   "   ",'Z',"                                 ",'_',00
+                    asc   "   ",'Z',"                                 ",'_',00
+                    asc   "   ",'Z',"                                 ",'_',00
+                    asc   "   ",'Z',"                                 ",'_',00
+                    asc   "   ",'Z',"                                 ",'_',00
+                    asc   "   ",'Z',"                                 ",'_',00
+                    asc   "   /                                 ",'_',00
+                    asc   "  /                                  ",'_',00
+                    asc   " /                                   ",'_',00
+                    asc   "/                                    ",'_',00
+                    asc   'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',00
+                    hex   00
 NinjaStrs           asc   "                        ",00
                     asc   "           ______       ",00
                     asc   "         .'      `.     ",00
@@ -1213,7 +1288,7 @@ NinjaStrs           asc   "                        ",00
                     asc   "      \ (        :      ",00
                     asc   " __.---``         `--._ ",00
                     asc   "/                      \",00
-                    hex   00,00,00,00,00,00     ; not needed
+                    hex   00
 NinjaAppleEyesClose asc   '@',"     ",'@',00
 NinjaAngryBrows     asc   "   _.:'|   ,-\---/--|   ",00,00,00
                     mx    %11
@@ -1222,24 +1297,21 @@ DrawNinjaXYClip     jsr   SetYClip              ; with A value
                     sty   text_v                ; works
                     lda   #NinjaStrs
                     ldy   #>NinjaStrs
-                    jsr   PrintStringsXYClip
-                    rts
+                    jmp   PrintStringsXYClip    ; implied rts
 
 
-NowPlayingStrs      asc   'Z',"                                Now Playing:                                 ",'_',00
-                    asc   'Z',"                              _________________                              ",'_',00
-                    asc   'Z',"                             ",'Z',"                 ",'_',"                             ",'_',00
-                    asc   'Z',"                              ",'LLLLLLLLLLLLLLLLL',"                              ",'_',00
-                    asc   'Z',"                                                                             ",'_',00
-                    asc   'Z',"                                                                             ",'_',00
-                    asc   'Z',"                                                                             ",'_',00
-                    asc   'Z',"                                                                             ",'_',00
-                    asc   'Z',"                                                                             ",'_',00
-                    asc   'Z',"                                                                             ",'_',00
-                    asc   'Z',"                                                                             ",'_',00
-                    asc   'Z',"                                                                             ",'_',00
-                    asc   'Z',"                                                                             ",'_',00
-                    asc   'Z',"                                                                             ",'_',00
+; x = x, y=y, clip = ylines to draw before stopping
+DrawLogoXYClip      jsr   SetYClip              ; with A value
+                    sty   text_v                ; works
+                    lda   #LogoStrs
+                    ldy   #>LogoStrs
+                    jmp   PrintStringsXYClip    ; implied rts
+
+
+NowPlayingStrs      asc   "   Now Playing:",00
+                    asc   " _________________",00
+                    asc   'Z',"                 ",'_',00
+                    asc   " ",'LLLLLLLLLLLLLLLLL',00
                     hex   00,00
 
 
@@ -1256,7 +1328,6 @@ WaitKey             mx    %11
                     rts
 KEY                 equ   $C000
 STROBE              equ   $C010
-
 
 
 

@@ -1,13 +1,8 @@
 **************************************************************************
 ** scrollist library - implement a scrolling selection list in a window **
 **************************************************************************
-
                   mx    %00
 
-
-** scroll-center algorithm
-** - if selected item is over half the value of the window height then offset becomes selected minus window height /2
-** - if at the end, the offset is greater than list size minus window height then offset = list size minus window height (stop scrolling)
 
 ** init example - set window and list properties
 **
@@ -17,13 +12,14 @@
 **                  lda   MyListCount                   ;\_ set number of items
 **                  sta   SL_itemscount                 ;/
 
+** handle keys example
+**     if up -> jsr SL_IncSelected
+**     if dn -> jsr SL_DecSelected
+**     if enter -> jsr SL_GetSelected and do something with it!
 
-** handle keys
-**     if up selected--
-**       if selected <0 selected = 0
-**     if dn selected++
-**       if selected > itemscount selected = itemscount
-**     if enter return index?  or trigger list "execution" routine
+** How the vertical scroll-center algorithm works (in case I forget)
+** - if selected item is over half the value of the window height then offset becomes selected minus window height /2
+** - if at the end, the offset is greater than list size minus window height then offset = list size minus window height (stop scrolling)
 
 
 SL_SETWINDOWSIZE  MAC
@@ -131,8 +127,6 @@ SL_DrawWindow     mx    %00
                   rts
 
 
-
-
 SL_selected       dw    0
 SL_offset         dw    0                       ; list offset (start position)
 SL_itemscount     dw    0                       ; set during init
@@ -147,87 +141,3 @@ SL_windowpos_x    dw    0
 SL_windowpos_y    dw    0
 SL_cur_y          dw    0                       ; used in window renderer
 SL_cur_off        dw    0                       ;
-
-
-* assume cursor xy is set for string printing
-* a = item index   -  uses 0 and 2 on dp
-SL_DemoList1RenderItem mx %00
-                  cmp   SL_itemscount           ; see if item exists
-                  bcc   :exists
-                  stz   2                       ; uninvert if blank
-                  lda   #SL_DemoListBlank       ; if not we draw blank lines
-                  bra   :continue
-                                                ; get item index
-:exists           tax
-                  stz   2                       ; don't change chars
-                  cpx   SL_selected
-                  bne   :not_selected
-                  lda   #$80
-                  sta   2
-:not_selected
-                  lda   #SL_DemoList1           ; start w pointer at beginning of list
-                  cpx   #0
-                  beq   :continue               ; no need to add anything
-
-                  clc
-:calc_item_start  adc   #SL_DemoList1ItemLen
-                  dex
-                  bne   :calc_item_start
-:continue         sta   0                       ; address of string at zero
-                  sep   #$30
-                  ldx   #SL_DemoList1ItemLen
-                  ldy   #0
-:pr_loop          lda   (0),y
-                  sec                           ;\___  char inverter
-                  sbc   2                       ;/
-                  jsr   COOT8
-                  iny
-                  dex
-                  bne   :pr_loop
-                  rep   #$30
-                  rts
-
-SL_DemoList1ItemLen =   9
-SL_DemoList1ItemCount = 3
-SL_DemoList1
-                  asc   "Liam     "
-                  asc   "Olivia   "
-                  asc   "Noah     "
-                  asc   "Riley    "
-                  asc   "Jackson  "
-                  asc   "Emma     "
-                  asc   "Aiden    "
-                  asc   "Ava      "
-                  asc   "Elijah   "
-                  asc   "Isabella "
-                  asc   "Grayson  "
-                  asc   "Aria     "
-                  asc   "Lucas    "
-                  asc   "Aaliyah  "
-                  asc   "Oliver   "
-                  asc   "Amelia   "
-                  asc   "Caden    "
-                  asc   "Mia      "
-                  asc   "Mateo    "
-                  asc   "Layla    "
-                  asc   "Muhammad "
-                  asc   "Zoe      "
-                  asc   "Mason    "
-                  asc   "Camilla  "
-                  asc   "Carter   "
-                  asc   "Charlotte"
-                  asc   "Jayden   "
-                  asc   "Eliana   "
-                  asc   "Ethan    "
-                  asc   "Mila     "
-                  asc   "Sebastian"
-SL_DemoListBlank  asc   "         "
-
-SL_DemoList1Run   mx    %00
-:setup            SL_SETWINDOWPOS 5;2
-                  SL_SETWINDOWSIZE 16;10
-                  SL_SETRENDERFUNCTION SL_DemoList1RenderItem
-                  lda   #SL_DemoList1ItemCount
-                  sta   SL_itemscount
-                  rts
-                  mx    %00

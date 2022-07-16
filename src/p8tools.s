@@ -6,9 +6,9 @@
 
 ** Inline Allocation... slower loading, maybe should figure out bank 00 allocation
                     ds    \
-P8_OPEN_BUFFER      ds    $400                  ; @todo: allocate  ..  buffer for open file being accessed
-P8_DATA_BUFFER      ds    P8_DATA_BUFFER_SZ     ; @todo: allocate  ..  buffer for file read data
-P8_DATA_BUFFER_SZ   =     $1000
+P8_OPEN_BUFFER      ds    $400                  ;
+P8_DATA_BUFFER      ds    P8_DATA_BUFFER_SZ     ;
+P8_DATA_BUFFER_SZ   =     $1000                 ; @todo this should be $1000 but I ran out of space :`(
 PT_PREFIX_BUFFER    ds    $100                  ; 256 byte area
 
 

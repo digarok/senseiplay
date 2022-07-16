@@ -270,6 +270,45 @@ PRINTSTR            MAC
                     <<<
 
 
+PRINTSTRXY          MAC
+                    lda   #]1
+                    sta   text_h
+                    lda   #]2
+                    sta   text_v
+                    lda   #]3
+                    ldy   #>]3
+                    jsr   PrintString
+                    <<<
+
+PRINTSTRSXY         MAC
+                    lda   #]2
+                    sta   text_v
+                    lda   #]3
+                    ldy   #>]3
+                    ldx   #]1                   ; horiz pos
+                    jsr   PrintStringsX         ; implied rts
+                    <<<
+
+;PRINTSTRXLUP #0;#3;#12;MenuMidStr              ; x;y;loopcount;str
+PRINTSTRXLUP        MAC
+                    lda   #]1
+                    sta   _printstringsx_horiz
+                    lda   #]2
+                    sta   text_v
+                    clc
+                    adc   #]3
+                    sta   _printstringsy_clip   ; end line #
+_lup                lda   _printstringsx_horiz
+                    sta   text_h
+                    lda   #]4
+                    ldy   #>]4
+                    jsr   PrintString
+                    inc   text_v
+                    lda   text_v
+                    cmp   _printstringsy_clip
+                    bne   _lup
+                    <<<
+
 
 * PrintString (A=Low Byte,  Y=High Byte)
 PrintString         mx    %11
@@ -292,6 +331,7 @@ PrintString         mx    %11
 BigNum              MAC
                     lda   #]2+{]1*$100}         ; multiply low byte by 256 and add high byte
                     <<<
+
 * lda #MainMenuStrs
 * ldy #>MainMenuStrs
 * ldx #05 ; horiz pos
