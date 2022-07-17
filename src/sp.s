@@ -1061,10 +1061,11 @@ DrawSplash          mx    %11
                     PRINTSTRSXY #5;#6;LogoStrs
                     lda   #$F0
                     jsr   SetColorDelay2
-                    ldx   #$80
+
+                    ldx   #$80                  ; DELAY
                     jsr   FadeDelay
-                    jsr   WipeSplash
-                    rts
+
+                                                ; FALL THROUGH FOR NOW
 WipeSplash          mx    %11
                     PRINTSTRSXY #4;#7;LogoStrs
                     lda   #$F0
@@ -1094,7 +1095,7 @@ WipeSplash          mx    %11
                     lda   #$50                  ; Y
                     jsr   SetColorDelay2
                     stz   $c022
-
+                    jsr   text_clear
                     rts
 
 * a=color
