@@ -131,7 +131,32 @@ DebugShowMouseText  mx    %11
                     bne   :loop4
                     rts
 
+* byte in a
+PRBYTEDEC           mx    %11
+                    sta   HEX24                 ; set conversion bytes
+                    stz   HEX24+1
+                    stz   HEX24+2
+                    jsr   HEX24TODEC8
+                    lda   DEC8+1
+                    beq   :no_hundreds
+                    jsr   PrintNum
+:no_hundreds        lda   DEC8
+                    lsr
+                    lsr
+                    lsr
+                    lsr
+                    beq   :no_tens
+                    jsr   PrintNum
+:no_tens            lda   DEC8
+                    and   #$0F
+                    jmp   PrintNum
 
+
+* a=digit 0-9   <-- print a single digit
+PrintNum            mx    %11
+                    clc
+                    adc   #"0"
+                    jmp   COOT8
 
 ** 24 (bit) hex to 8 (nibble) / 4 byte BCD
 HEX24TODEC8         mx    %11
@@ -399,4 +424,12 @@ SetGSText           mx    %11
 Setup80Col          mx    %11
                     lda   #$A0                  ; USE A BLANK SPACE TO
                     jsr   $C300                 ; TURN ON THE VIDEO FIRMWARE
+                    rts
+GoXCenter
+                    lsr                         ; /2  < - CENTER ROUTINE
+                    sta   :center+1
+                    lda   #40
+                    sec
+:center             sbc   #0                    ;smc
+                    sta   text_h
                     rts

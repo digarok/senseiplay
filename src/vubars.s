@@ -4,7 +4,7 @@ VUBarDecayValue     db    #$1                   ; how much to decay between step
 VUBarValues         ds    #VUBarMaxTracks*2
 VUBarDecays         ds    #VUBarMaxTracks*2
 VUBarX              dw    #$0004
-VUBarY              =     #13
+VUBarY              =     #9
 VUBarCount          dw    #$04
 VUBarMaxTracks      =     #32                   ; I'm not sure of max tracks so doing 32 to be safe
 VUBarWidth          db    #4                    ; 2,4,6?
