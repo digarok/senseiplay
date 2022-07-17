@@ -464,8 +464,7 @@ MenuEnterSelected   mx    %00
 
 
 
-NTPFileVerStr       asc   "NTP File Version: "
-NTPFileVerByte      asc   " ",00
+
 NTPFileVer          db    0                     ; actual value in case we need to branch on this
 NTPNumTracks        db    0
 NTPNumInst          db    0
@@ -480,16 +479,16 @@ ParseSongInfo       mx    %00
                     ldy   #4
                     ldal  [ModZPPtr],Y
                     sta   NTPFileVer
-                    clc
-                    adc   #"0"
-                    sta   NTPFileVerByte
                     iny
                     ldal  [ModZPPtr],Y
                     sta   NTPNumTracks
+                    iny
                     ldal  [ModZPPtr],Y
                     sta   NTPNumInst
+                    iny
                     ldal  [ModZPPtr],Y
                     sta   NTPNumPatt
+                    iny
                     ldal  [ModZPPtr],Y
                     sta   NTPLenPatt
 
@@ -500,14 +499,60 @@ PlayerUi            mx    %00                   ; @todo: this is a mess
                     jsr   DrawMenuBackgroundBox
                     PRINTSTRSXY #3;#3;SenseiLogoStrs
                     PRINTSTRXY #30;#1;PatPosString ; title pat/pos (in title bar)
-                    PRINTSTRSXY #30;VUBarY-4;NowPlayingStrs
-                    PRINTSTRXY #58;#22;NTPFileVerStr ; file version
+                    PRINTSTRSXY #16;VUBarY+7;FileInfoStrs
+
+                    lda   VUBarY+9
+                    sta   text_v
+                    lda   NTPFileVer
+                    cmp   #$2                   ; version 2 or above??
+                    bcc   :skip_v2_metadata
+                    jsr   DrawV2Metadata
+                    inc   text_v
+:skip_v2_metadata   lda   text_v
+
+                    pha
+                    inc   text_v                ; next line
+                    ldx   #19
+                    lda   #FileInfoDetStrs
+                    ldy   #>FileInfoDetStrs
+                    jsr   PrintStringsX         ; implied rts
+                    dec   text_v
+                    dec   text_v                ; back up
+                    pla
+
+                    lda   #27
+                    sta   text_h
+                    lda   NTPNumTracks
+                    jsr   PRBYTEDEC
+
+                    lda   #56
+                    sta   text_h
+                    lda   NTPNumInst
+                    jsr   PRBYTEDEC
+
+                    inc   text_v                ; next line
+                    lda   #29
+                    sta   text_h
+                    lda   NTPNumPatt
+                    jsr   PRBYTEDEC
+
+                    lda   #38
+                    sta   text_h
+
+                    lda   NTPLenPatt
+                    jsr   PRBYTEDEC
+
+                    lda   #61
+                    sta   text_h
+
+                    lda   NTPFileVer
+                    jsr   PRBYTEDEC
+
+
 
                     clc
                     xce
                     rep   #$30
-
-
 
 
                     jsr   SL_GetSelected        ; print name
@@ -515,16 +560,25 @@ PlayerUi            mx    %00                   ; @todo: this is a mess
                     jsr   SetPtr0toDirEntry
 
                     sep   $30
-                    GOXY  #32;VUBarY-2
+
+                    lda   (0)                   ; length byte
+                    lsr                         ; /2
+                    sta   :center+1
+                    lda   #40
+                    sec
+:center             sbc   #0                    ;smc
+                    sta   text_h
+                    lda   VUBarY+8
+                    sta   text_v
                     rep   $30
 
                     lda   $0
                     >>>   PT_PrintProdosStr
-                    jsr   _NTPgetvuptr
 
+
+                    jsr   _NTPgetvuptr
                     stx   0
                     sty   2
-
 :set_vu_x_offset    lda   [0]                   ; number of tracks
                     sta   VUBarCount
                     tax
@@ -532,6 +586,38 @@ PlayerUi            mx    %00                   ; @todo: this is a mess
                     jsr   SetVUBarOffset
                     jsr   RenderVUBoxes
                     rts
+
+
+DrawV2Metadata      mx    %11
+                    ldy   #9                    ; in v2,
+                    ldal  [ModZPPtr],Y
+                    beq   :done_title
+                    pha
+
+                    jsr   GoXCenter
+                    dec   text_h
+                    lda   VUBarY+10
+                    sta   text_v
+                    lda   #"!"+1                 ; quote :P
+                    jsr   COOT8
+
+
+                    plx                         ; count in x
+
+                    ldy   #10
+:print_title        cpx   #0
+                    beq   :q
+                    lda   [ModZPPtr],y
+                    ora   #%1000                0000
+                    jsr   COOT8
+                    iny
+                    dex
+                    bra   :print_title
+:q                  lda   #"!"+1                 ; quote :P
+                    jsr   COOT8
+:done_title         rts
+
+
 
 
 MenuActions         db    #'w'
@@ -1064,6 +1150,8 @@ DrawSplash          mx    %11
 
                     ldx   #$80                  ; DELAY
                     jsr   FadeDelay
+                    bcc   WipeSplash
+                    rts                         ; they hit key - skip
 
                                                 ; FALL THROUGH FOR NOW
 WipeSplash          mx    %11
@@ -1108,8 +1196,14 @@ SetColorDelay2      sta   $c022
 * x=delay
 FadeDelay           mx    %11
 :loop               jsr   WaitVBL
-                    dex
+                    lda   KEY
+                    bpl   :nope
+                    sta   STROBE
+                    sec
+                    rts
+:nope               dex
                     bne   :loop
+                    clc
                     rts
 
 DrawNinjaBubble     mx    %11
@@ -1233,7 +1327,7 @@ LogoStrs            asc   "                                                 ",00
 
 
 MenuTopStrs         asc   " ______________________________________________________________________________",00
-                    asc   'ZV_@'," v0.1.2",'ZVWVWVWVWVWVWVWVWVWVWVWV_',"Ninjaforce",'ZVWVWVWVWVWVWVWVWV_',"][ infinitum",'ZW_',00
+                    asc   'ZV_@'," v0.1.3",'ZVWVWVWVWVWVWVWVWVWVWVWV_',"Ninjaforce",'ZVWVWVWVWVWVWVWVWV_',"][ infinitum",'ZW_',00
                     asc   'ZLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL_',00
                     hex   00
 MenuMidStr          asc   'Z',"                                                                              ",'_',00
@@ -1244,6 +1338,26 @@ SenseiLogoStrs      asc   "   _____                                _     ____   
                     asc   " ___/ / /  __/ / / / / (__  ) /  __/ / /   / ____/  / /  / /_/ /  / /_/ / ",00
                     asc   "/____/  \___/ /_/ /_/ /____/  \___/ /_/   /_/      /_/   \__,_/   \__, / ",00
                     asc   "                                                                 /____/  ",00
+                    hex   00
+
+
+FileStr             asc   "File: ",00
+NowPlayingStrs      asc   " _______________________",00
+NowPlayingBStrs     asc   'Z',"                       ",'_',00
+                    asc   " ",'LLLLLLLLLLLLLLLLLLLLLLL',00
+                    hex   00,00
+TitleStr            asc   "title:",00
+FileInfoStrs        asc   " ______________________________________________",00
+                    asc   'Z^GGGGGGGGGGGGG_',"                 ",'ZGGGGGGGGGGGGG_',00
+                    asc   'ZLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL_',00
+                    asc   'Z',"                                              ",'_',00
+                    asc   'Z',"                                              ",'_',00
+                    asc   'Z',"                                              ",'_',00
+                    asc   'Z',"                                              ",'_',00
+                    hex   00
+
+FileInfoDetStrs     asc   "Tracks:                 Instruments:",00
+                    asc   "Patterns:     Len:      NTP File Version:",00
                     hex   00
 
 ChooseTrackStr      asc   "Choose a track:",00
@@ -1307,13 +1421,6 @@ DrawLogoXYClip      jsr   SetYClip              ; with A value
                     lda   #LogoStrs
                     ldy   #>LogoStrs
                     jmp   PrintStringsXYClip    ; implied rts
-
-
-NowPlayingStrs      asc   "   Now Playing:",00
-                    asc   " _________________",00
-                    asc   'Z',"                 ",'_',00
-                    asc   " ",'LLLLLLLLLLLLLLLLL',00
-                    hex   00,00
 
 
                     ds    \
