@@ -20,7 +20,6 @@ InitTextTools       php
 
 COOT8               mx    %11
 text_print_char8    =     *
-                    phy
                     phx
                     sta   text_char
 
@@ -28,13 +27,13 @@ text_print_char8    =     *
 
                     lda   text_v
                     asl
-                    tay
+                    tax
                     lda   text_h
                     lsr
                     bcc   text_print_char_8b
 
                     clc
-                    adc   table,y
+                    adc   table,x
                     tax
                     sep   $20                   ; shortm
                     lda   text_char             ; could push/pop
@@ -42,12 +41,11 @@ text_print_char8    =     *
                     sep   $30
                     inc   text_h
                     plx
-                    ply
                     rts
 
 text_print_char_8b  =     *
                     mx    %00
-                    adc   table,y
+                    adc   table,x
                     tax
                     sep   $20                   ; shortm
                     lda   text_char
@@ -55,7 +53,6 @@ text_print_char_8b  =     *
                     sep   $30
                     inc   text_h
                     plx
-                    ply
                     rts
 
 ;--------------------------
