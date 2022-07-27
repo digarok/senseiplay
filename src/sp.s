@@ -215,15 +215,15 @@ DirectoryRenderItem mx    %00
                     ldy   #19
                     lda   (0),Y
                     sta   HEX24+2               ; set for conv
-                                                ;       jsr PrHex
+
                     ldy   #18
                     lda   (0),Y
                     sta   HEX24+1               ; set for conv
-                                                ;      jsr PrHex
+
                     ldy   #17
                     lda   (0),Y
                     sta   HEX24+0               ; set for conv
-                                                ;        jsr PrHex
+
 
                     jsr   HEX24TODEC8
                     jsr   DEC8TOCHAR10R
@@ -292,7 +292,8 @@ MenuLoop            clc
 
 PlayerLoop          mx    %00
 
-:key_loop           jsr   ShowTrackPos
+:key_loop           rep   $30
+                    jsr   ShowTrackPos
                     jsr   ShowVUs
                     sep   $30
                     lda   KEY
@@ -305,10 +306,7 @@ PlayerLoop          mx    %00
                     clc
                     xce
                     rep   $30
-
                     jsr   _NTPstop
-
-
                     rts
 
 ShowVUs             clc
@@ -323,7 +321,6 @@ ShowVUs             clc
 :vu_loop
                     lda   [0],y
                     jsr   RenderVUBar
-
                     jsr   RenderVUVals
                     iny
                     iny
@@ -333,85 +330,24 @@ ShowVUs             clc
 
 
 
-ShowTrackPos        clc
-                    xce
-                    rep   $30
+ShowTrackPos        mx    %00
                     jsr   _NTPgetsongpos
                     stx   0
                     sty   2
                     sep   $30
-
-
                                                 ; bg area pre-drawn at start
-                    GOXY  #36;#1                ; cursor
+                    GOXY  #35;#1                ; cursor
                     ldy   #4                    ; pat
                     lda   [0],y
-                    jsr   PrHex
-                    GOXY  #46;#1                ; cursor
+                                                ;jsr   PrHex
+                    jsr   PRBYTEDECPADH
+                    GOXY  #45;#1                ; cursor
                     ldy   #8                    ; pos
                     lda   [0],y
-                    jsr   PrHex
-
-
-                    rts                         ;; <- remove for additional debugging
-                    GOXY  #22;#22               ;;; debug show track pos
-                    ldy   #2
-                    ldal  [0],y
-                    jsr   PrHex
-                    ldy   #3
-                    ldal  [0],y
-                    jsr   PrHex
-
-                    lda   #" "
-                    jsr   COOT8
-                    ldy   #4
-                    ldal  [0],y
-                    jsr   PrHex
-                    ldy   #5
-                    ldal  [0],y
-                    jsr   PrHex
-
-                    lda   #" "
-                    jsr   COOT8
-                    ldy   #6
-                    ldal  [0],y
-                    jsr   PrHex
-                    ldy   #7
-                    ldal  [0],y
-                    jsr   PrHex
-
-                    lda   #" "
-                    jsr   COOT8
-                    ldy   #8
-                    ldal  [0],y
-                    jsr   PrHex
-                    ldy   #9
-                    ldal  [0],y
-                    jsr   PrHex
-
-                    lda   #" "
-                    jsr   COOT8
-                    lda   #" "
-                    jsr   COOT8
-                    lda   #" "
-                    jsr   COOT8
-                    ldy   #10
-                    ldal  [0],y
-                    jsr   PrHex
-                    ldy   #11
-                    ldal  [0],y
-                    jsr   PrHex
-
-                    lda   #" "
-                    jsr   COOT8
-                    ldy   #12
-                    ldal  [0],y
-                    jsr   PrHex
-                    ldy   #13
-                    ldal  [0],y
-                    jsr   PrHex
-                    rts                         ; should return in 8-bit
-
+                                                ;jsr   PrHex
+                    jsr   PRBYTEDECPADH
+                    rep   $30
+                    rts
 
 
 
@@ -449,7 +385,10 @@ MenuEnterSelected   mx    %00
                     jsr   DrawNinjaLoadEyes
                     jsr   SaveDP
                     jsr   LoadNTP
-                    jsr   RestoreDP
+                    bcc   :play
+:load_err           jsr   RestoreDP
+                    rts
+:play               jsr   RestoreDP
                     jsr   StartMusic            ; seems to return mx=11
                     bcs   :err
                     clc
@@ -472,10 +411,9 @@ NTPNumPatt          db    0
 NTPLenPatt          db    0
 
 ParseSongInfo       mx    %00
+                    jsr   SetModZPPtr
 
-                    jsr   SetModZPPtr           ;NEW
-
-                    sep   $30                   ; NEW
+                    sep   $30
                     ldy   #4
                     ldal  [ModZPPtr],Y
                     sta   NTPFileVer
@@ -491,9 +429,9 @@ ParseSongInfo       mx    %00
                     iny
                     ldal  [ModZPPtr],Y
                     sta   NTPLenPatt
-
                     rts
-PlayerUi            mx    %00                   ; @todo: this is a mess
+
+PlayerUi            mx    %00
                     sep   #$30
 
                     jsr   DrawMenuBackgroundBox
@@ -547,8 +485,6 @@ PlayerUi            mx    %00                   ; @todo: this is a mess
 
                     lda   NTPFileVer
                     jsr   PRBYTEDEC
-
-
 
                     clc
                     xce
@@ -608,7 +544,7 @@ DrawV2Metadata      mx    %11
 :print_title        cpx   #0
                     beq   :q
                     lda   [ModZPPtr],y
-                    ora   #%1000                0000
+                    ora   #%1000_0000
                     jsr   COOT8
                     iny
                     dex
@@ -696,32 +632,11 @@ UnloadNTP           mx    %00
 *********************************************************
 LoadNTP             mx    %11
 
-                    *   sep   $30
-                    *   lda $0
-                    *   ldy $1
-                    *   pha
-                    *   phy
-                    * ;  jsr DrawNinjaBubble
-                    * ;  jsr DrawNinjaInPlace
-                    *   GOXY #36;#13
-                    *   lda #LoadingFileString
-                    *   ldy #>LoadingFileString
-                    * ;  ldx #36 ; horiz pos
-                    * ;  jsr PrintStringsX
-                    *   lda 0                         ; filename
-                    *   >>> PT_PrintProdosStr
-                    *   ply
-                    *   pla
-                    *   sta $0
-                    *   sty $1
-
-
                     clc
                     xce
                     rep   $30
                                                 ; >>>   PT_GetPrefix            ; returns ptr in A ...
                                                 ; >>>   PT_PrintProdosStr ; "/SENSEIPLAY/" is where we start
-
 
 * NEW STUFF
                     ldy   #19                   ; size offset (3-byte) from file entry
@@ -732,10 +647,14 @@ LoadNTP             mx    %11
                     lda   (0),Y
                     tay
                     jsr   AllocContiguousPageAlign ; allocate that much
-                    sta   BnkMODHnd+2           ; save the handle
+                    cpx   #$FFFF
+                    bne   :noerr
+                    jsr   NinjaErrCantAlloc
+                    sec
+                    rts
+
+:noerr              sta   BnkMODHnd+2           ; save the handle
                     stx   BnkMODHnd
-
-
                     stx   $08                   ; dereference ptr
                     sta   $0a
                     ldy   #0
@@ -746,6 +665,7 @@ LoadNTP             mx    %11
                     sta   BnkMODPtr+2
                     jsr   SetModZPPtr           ; slower but consistent
                     PT_LoadFilePtrToPtr 0;ModZPPtr ; and load file into allocated RAM
+                    clc
                     rts
 
 ModZPPtr            =     $14                   ; long ptr to mod data
@@ -764,7 +684,7 @@ StartMusic          mx    %00
                     lda   #0                    ; no channel doubling
                     jsr   _NTPprepare
                     bcc   :ok
-                    jsr   HoldUp
+                    jsr   NinjaErrCantPlay
                     sec
                     rts
 
@@ -775,17 +695,35 @@ StartMusic          mx    %00
                     clc
                     rts
 
-HoldUp              mx    %00
+NinjaErrCantAlloc   mx    %00
+                    xba                         ; change order for printing
+                    pha
+                    sep   $30
+                    jsr   DrawOnlyNinjaBackground
+                    jsr   DrawNinjaBubble
+                    PRINTSTRXY #36;#13;CantAllocMemString
+                    PRINTSTRXY #3;#14;NinjaAngryBrows
+                    GOXY  #46;#17
+                    pla
+                    jsr   PrHex
+                    pla
+                    jsr   PrHex
+                    jsr   BorderCops            ; <- anim delay
+                    bra   NinjaErrCleanupReturn
+
+
+NinjaErrCantPlay    mx    %00
                     sep   $30
                     jsr   DrawOnlyNinjaBackground
                     jsr   DrawNinjaBubble
                     PRINTSTRXY #36;#13;CantPlayFileString
                     PRINTSTRXY #3;#14;NinjaAngryBrows
-
                     jsr   BorderCops            ; <- anim delay
+                    bra   NinjaErrCleanupReturn
 
+NinjaErrCleanupReturn
                     jsr   TextColorSet
-:cleanup            jsr   DrawMenuBackground
+                    jsr   DrawMenuBackground
                     jsr   DrawNinjaInPlace
                     rts
 
@@ -1095,10 +1033,31 @@ DoHelp              mx    %00                   ; comes from MenuAction
                     jsr   WaitKey
                     jsr   DrawNinjaBubble
                     PRINTSTRSXY #36;#10;ThankStr0
+                    jsr   Digawait              ; special wait
+                    jsr   DrawNinjaBubble
+                    PRINTSTRSXY #33;#9;MoreTracksStrs
                     jsr   WaitKey
 
 :cleanup            jsr   DrawMenuBackground
                     jmp   DrawNinjaInPlace
+
+Digawait            mx    %11
+:loop               PRINTSTRXY #49;#10;Dig1
+                    ldx   #$30                  ; DELAY
+                    jsr   FadeDelay
+                    bcs   :done
+                    PRINTSTRXY #49;#10;Dig2
+                    ldx   #$30                  ; DELAY
+                    jsr   FadeDelay
+                    bcs   :done
+                    PRINTSTRXY #49;#10;Dig3
+                    ldx   #$30                  ; DELAY
+                    jsr   FadeDelay
+                    bcs   :done
+                    bra   :loop
+
+
+:done               rts
 
 DrawOnlyNinjaBackground mx %11
                     jsr   DrawMenuBackgroundBox
@@ -1294,7 +1253,9 @@ IcoDirString        asc   'XY'," ",$00
 IcoParentString     asc   'KI'," ",$00
 IcoVolString        asc   'Z^'," ",$00
 IcoNoString         asc   "   ",$00
-CantPlayFileString  asc   "Can't play this file!@#!",$00,$00,$00
+CantPlayFileString  asc   "Can't play this file!!",$00,$00,$00
+CantAllocMemString  asc   "Can't allocate memory!!",$00,$00,$00
+
 LoadingFileString   asc   "Loading ",$00,$00,$00
 
 HelpStr0            asc   'J'," ",'K'," Use arrows to navigate.",00
@@ -1303,19 +1264,33 @@ HelpStr1            asc   "  ",'M'," Press Return to play song",'I',00
                     asc   " ",00
 HelpStr2            asc   " 'C' = Change 'C'olor ",00
 HelpStr3            asc   " 'B' = Change 'B'ackground",00
+                    asc   " ",00
 HelpStr4            asc   " 'Q' = 'Q'uit",00
                     hex   00,00
 
+Dig1                asc   "DiGaRoK",00
+Dig2                asc   "D1G@R0K",00
+Dig3                asc   "D|GaR",'A',"K",00
 ThankStr0           asc   'U'," Written by DiGaRoK ",'H',00
                     asc   " ",00
                     asc   "  ",'@A@',"  Thanks!!! ",'@A@',00
                     asc   "  ",'[',"   Jesse Blue   ",'[',00
+                    asc   "  ",'[',"     FatDog     ",'[',00
                     asc   "  ",'[',"    J.Craft     ",'[',00
                     asc   "  ",'[',"    DWSJason    ",'[',00
-                    asc   "  ",'[',"     FatDog     ",'[',00
                     asc   "  ",'['," Antoine Vignau ",'[',00
                     hex   00
-
+MoreTracksStrs      asc   "Want more songs?  ",00
+                    asc   "  Use the online converter at:",00
+                    asc   " ",00
+                    asc   "   >>",'UU'," ninjaforce.com ",'HH',"<<",00
+                    asc   " ",00
+                    asc   "You can convert MODs that you",00
+                    asc   "find online, or you can write",00
+                    asc   "your own using programs like ",00
+                    asc   "OpenMPT.  Have Fun!",00
+                    asc   "                           -D",00
+                    hex   00
 
 LogoStrs            asc   "                                                 ",00
                     asc   "            _              _             ____                            ",00
@@ -1327,7 +1302,7 @@ LogoStrs            asc   "                                                 ",00
 
 
 MenuTopStrs         asc   " ______________________________________________________________________________",00
-                    asc   'ZV_@'," v0.1.3",'ZVWVWVWVWVWVWVWVWVWVWVWV_',"Ninjaforce",'ZVWVWVWVWVWVWVWVWV_',"][ infinitum",'ZW_',00
+                    asc   'ZV_@'," v1.0.1",'ZVWVWVWVWVWVWVWVWVWVWVWV_',"Ninjaforce",'ZVWVWVWVWVWVWVWVWV_',"][ infinitum",'ZW_',00
                     asc   'ZLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL_',00
                     hex   00
 MenuMidStr          asc   'Z',"                                                                              ",'_',00
@@ -1406,6 +1381,7 @@ NinjaStrs           asc   "                        ",00
                     hex   00
 NinjaAppleEyesClose asc   '@',"     ",'@',00
 NinjaAngryBrows     asc   "   _.:'|   ,-\---/--|   ",00,00,00
+
                     mx    %11
 ; x = x, y=y, clip = ylines to draw before stopping
 DrawNinjaXYClip     jsr   SetYClip              ; with A value
@@ -1423,10 +1399,7 @@ DrawLogoXYClip      jsr   SetYClip              ; with A value
                     jmp   PrintStringsXYClip    ; implied rts
 
 
-                    ds    \
-DirListMaxEntries   =     256
-DirListEntrySize    =     20                    ; 16 name + 1 type + 3 len
-DirList             ds    #DirListEntrySize*DirListMaxEntries
+
 WaitKeyColor        mx    %11
                     inc   $c034
 WaitKey             mx    %11
@@ -1439,8 +1412,9 @@ STROBE              equ   $C010
 
 
 
-                    put   p8tools
+
                     put   texttools
                     put   scrollist
                     put   vubars
+                    put   p8tools               ; last
                     dsk   sensei.system

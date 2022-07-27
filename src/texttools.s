@@ -152,6 +152,31 @@ PRBYTEDEC           mx    %11
                     jmp   PrintNum
 
 
+* byte in a
+PADCHAR             db    #" "
+PRBYTEDECPADH       mx    %11                   ; only padding the hundreds column
+                    sta   HEX24                 ; set conversion bytes
+                    stz   HEX24+1
+                    stz   HEX24+2
+                    jsr   HEX24TODEC8
+:hundreds           lda   DEC8+1
+                    bne   :print_hundreds
+                    jsr   PrintPadChar
+                    bra   :tens
+:print_hundreds     jsr   PrintNum
+:tens               lda   DEC8
+                    lsr
+                    lsr
+                    lsr
+                    lsr
+:print_tens         jsr   PrintNum
+:ones               lda   DEC8
+                    and   #$0F
+                    jmp   PrintNum
+
+PrintPadChar        lda   PADCHAR
+                    jmp   COOT8
+
 * a=digit 0-9   <-- print a single digit
 PrintNum            mx    %11
                     clc

@@ -86,11 +86,9 @@ SetVUBarOffset      mx    %00
 * a = count
 RenderVUBoxes       mx    %00
                     sep   $30
-                                                ; STZ   VUBarX                ; TEMP DELETE!
+
 :prep_offset        lda   VUBarX
-
                     sta   $FE                   ; ptr for goxy
-
 
 :tops               GOXY  $FE;#VUBarY           ; DO TOPS
                     ldx   VUBarCount
@@ -176,7 +174,6 @@ RenderVUBar         mx    %00
 
                     phy
                     phx
-
 
                     sep   $30
                     mx    %11
@@ -318,8 +315,6 @@ VUOffPrint          mx    %11
 
 
 
-
-
 _vu6_offs           db    #$20,#$30,#$40,#$50
 * y = (vu number*2)+2
 RenderVUVals        mx    %00
@@ -331,7 +326,6 @@ RenderVUVals        mx    %00
                     dec
                     pha
 
-
                     ldy   VUBarWidth
                     cpy   #4
                     beq   :vu4
@@ -341,8 +335,6 @@ RenderVUVals        mx    %00
 :vu2                clc
                     adc   VUBarX
                     bra   :print
-
-
 
 :vu6                lsr
                     tax
@@ -366,37 +358,35 @@ RenderVUVals        mx    %00
                     lda   VUBarValues,x
                     jsr   PrHex
 
-:vu_done            clc
-                    xce
-                    rep   $30
+:vu_done            rep   $30
                     ply
                     plx
                     rts
 
 * y = (vu number*2)+2   a = value
-RenderVU            mx    %00
+* RenderVU            mx    %00
 
-                    phx
-                    phy
-                    sep   $30
-                    pha
-                    tya
-                    lda   VUBarWidth
-                    cmp   #2
-                    beq   :noshift
-                    asl                         ; now *4
-:noshift            clc
-                    adc   VUBarX                ; add offset
-                    sta   8
-                    GOXY  8;VUBarY+6
+*                     phx
+*                     phy
+*                     sep   $30
+*                     pha
+*                     tya
+*                     lda   VUBarWidth
+*                     cmp   #2
+*                     beq   :noshift
+*                     asl                         ; now *4
+* :noshift            clc
+*                     adc   VUBarX                ; add offset
+*                     sta   8
+*                     GOXY  8;VUBarY+6
 
-                    pla
-                    jsr   PrHex
+*                     pla
+*                     jsr   PrHex
 
-                    clc
-                    xce
-                    rep   $30
+*                     clc
+*                     xce
+*                     rep   $30
 
-                    ply
-                    plx
-                    rts
+*                     ply
+*                     plx
+*                     rts

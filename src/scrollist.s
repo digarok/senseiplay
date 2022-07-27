@@ -107,8 +107,6 @@ SL_DrawWindow     mx    %00
                   stx   text_h
                   ldy   SL_cur_y
                   sty   text_v
-                  clc
-                  xce
                   rep   #$30
                   lda   SL_cur_off
 :render_item      jsr   $0000                   ; smc  "jsr SL_renderfunction"

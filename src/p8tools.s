@@ -1,15 +1,3 @@
-** No Allocation mode... maybe not safe
-* P8_OPEN_BUFFER    =     $800                    ; @todo: allocate  ..  buffer for open file being accessed
-* P8_DATA_BUFFER    =     $D00                    ; @todo: allocate  ..  buffer for file read data
-* P8_DATA_BUFFER_SZ =     $1000                   ;
-* PT_PREFIX_BUFFER  =     $1D00                   ; 256 byte area
-
-** Inline Allocation... slower loading, maybe should figure out bank 00 allocation
-                    ds    \
-P8_OPEN_BUFFER      ds    $400                  ;
-P8_DATA_BUFFER      ds    P8_DATA_BUFFER_SZ     ;
-P8_DATA_BUFFER_SZ   =     $1000                 ; @todo this should be $1000 but I ran out of space :`(
-PT_PREFIX_BUFFER    ds    $100                  ; 256 byte area
 
 
 P8_MLI_CALL         =     $bf00
@@ -116,10 +104,7 @@ P8_SET_MARK_PCNT    =     2
 
 
 
-
-
 *************************** MACROS **********************************
-
 * A=ptr to str (with prefix length byte)
 * This sets the high bit for each character in the string before printing
 PT_PrintProdosStr   MAC
@@ -802,14 +787,19 @@ AllocContiguousPageAlign mx %00
 
                     PushLong #0
                     _NewHandle                  ; returns LONG Handle on stack
-                    _Err
-                    plx                         ; base address of the new handle
+                    bcc   :returnHandle
+:allocError         plx                         ; clear stack result
+                    plx
+                    ldx   #$FFFF
+                    rts                         ; return error in A
+:returnHandle       plx                         ; base address of the new handle
                     pla                         ; high address 00XX of the new handle (bank)
                     rts
 
 
-
-
+MM_memErr           =     $0201                 ; Unable to allocate block
+MM_lockErr          =     $0204                 ; Illegal operation on a locked or immovable block
+MM_idErr            =     $0207                 ; Invalid user ID
 
 
 
@@ -875,3 +865,18 @@ AllocContiguousPageAlign mx %00
 
                     FIN
 
+** No Allocation mode... maybe not safe
+* P8_OPEN_BUFFER    =     $800                    ; @todo: allocate  ..  buffer for open file being accessed
+* P8_DATA_BUFFER    =     $D00                    ; @todo: allocate  ..  buffer for file read data
+* P8_DATA_BUFFER_SZ =     $1000                   ;
+* PT_PREFIX_BUFFER  =     $1D00                   ; 256 byte area
+
+** Inline Allocation... slower loading, maybe should figure out bank 00 allocation
+                    ds    \
+P8_OPEN_BUFFER      ds    $400                  ;
+P8_DATA_BUFFER      ds    P8_DATA_BUFFER_SZ     ;
+P8_DATA_BUFFER_SZ   =     $1000                 ; @todo this should be $1000 but I ran out of space :`(
+PT_PREFIX_BUFFER    ds    $100                  ; 256 byte area
+DirListMaxEntries   =     256
+DirListEntrySize    =     20                    ; 16 name + 1 type + 3 len
+DirList             ds    #DirListEntrySize*DirListMaxEntries
