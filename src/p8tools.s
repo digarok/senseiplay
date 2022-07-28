@@ -1,9 +1,9 @@
 
 
 P8_MLI_CALL         =     $bf00
-PT_DST_PTR          =     $00                   ; DP location used for copies
-PT_TMP_PTR          =     $04                   ; Use for internal routines like string handling
 PT_DIR_ENTRY_PTR    =     $08                   ; point to current entry when scanning a directory
+PT_TMP_PTR          =     $0C                   ; Use for internal routines like string handling
+PT_DST_PTR          =     $10                   ; DP location used for copies
 P8_ERR_BUF_IN_USE   =     #$56                  ; when the specified buffer is marked in-use by Prodos system table
 P8_ERR_EOF          =     #$4C                  ; hit End Of File (or directory)
 
@@ -114,10 +114,10 @@ PT_PrintProdosStr   MAC
 _PT_PrintProdosStr  mx    %00
                     sta   PT_TMP_PTR
                     sep   #$30
-                    lda   [PT_TMP_PTR]          ; length byte
+                    lda   (PT_TMP_PTR)          ; length byte
                     tax
                     ldy   #1                    ; pre-increment index past length byte
-:prloop             lda   [PT_TMP_PTR],y        ; SMC
+:prloop             lda   (PT_TMP_PTR),y        ; SMC
                     ora   #%1000_0000           ; make printable char
                     jsr   COOT8
                     iny

@@ -573,6 +573,8 @@ MenuActions         db    #'w'
                     db    #'C'
                     db    #'b'                   ; background
                     db    #'B'
+                    db    #'d'
+                    db    #'D'
 
                     db    #'?'
 MenuActionsCount    =     *-MenuActions
@@ -595,6 +597,8 @@ MenuRoutines        da    SL_DecSelected
                     da    DoColor
                     da    DoBGColor
                     da    DoBGColor
+                    da    DoDoubler
+                    da    DoDoubler
 
 
                     da    DoHelp
@@ -681,7 +685,7 @@ SetModZPPtr         mx    %00
 StartMusic          mx    %00
                     ldx   BnkMODPtr
                     ldy   BnkMODPtr+2
-                    lda   #0                    ; no channel doubling
+                    lda   _double_chans         ; configurable (0=off/1=on)
                     jsr   _NTPprepare
                     bcc   :ok
                     jsr   NinjaErrCantPlay
@@ -714,10 +718,21 @@ NinjaErrCantAlloc   mx    %00
 
 NinjaErrCantPlay    mx    %00
                     sep   $30
+                    pha                         ; just save error code as 8-bit ;)
+
                     jsr   DrawOnlyNinjaBackground
                     jsr   DrawNinjaBubble
-                    PRINTSTRXY #36;#13;CantPlayFileString
+                    PRINTSTRXY #35;#13;CantPlayFileString
                     PRINTSTRXY #3;#14;NinjaAngryBrows
+                    GOXY  #36;#16
+                    pla                         ; err code
+                    dec                         ; natural number to zero-index
+                    asl
+                    tax
+                    ldy   NTPPrep_Errs+1,x
+                    lda   NTPPrep_Errs,x
+                    ldx   #35                   ; x position
+                    jsr   PrintStringsX
                     jsr   BorderCops            ; <- anim delay
                     bra   NinjaErrCleanupReturn
 
@@ -786,7 +801,6 @@ BorderCops          mx    %00
 :under
 :over               stz   $c034
 
-
                     lda   KEY
                     bpl   :nokey
                     sta   STROBE
@@ -794,7 +808,7 @@ BorderCops          mx    %00
                     rts
 :nokey
                     rep   #$30
-                    INCROLL 2;#$2F00            ; check delay
+                    INCROLL 2;#$5000            ; check delay
                     beq   :done16
                     sep   #$30
                     bra   :loop
@@ -1020,8 +1034,31 @@ DoBGColor           mx    %00
                     and   #$F0
                     ora   _cur_bordercolor      ; pick up bg color
                     sta   _cur_textcolor
-
                     rep   #$30
+                    rts
+
+DoDoubler           mx    %00
+                    lda   _double_chans
+                    eor   %1
+                    sta   _double_chans
+                    ldx   #$0                   ; show status always
+                    jsr   DrawDoublerStatus
+                    rts
+
+
+_double_chans       dw    0                     ; default is off (word because we load a 16 bit value)
+
+DrawDoublerStatus   mx    %00
+                    sep   #$30
+                    lda   _double_chans
+                    bne   :not_zero
+                    cpx   #1
+                    bne   :zero
+                    bra   :exit                 ; if x isn't zero, we stay quiet
+:zero               PRINTSTRXY #37;#9;DoubleOffStr
+                    bra   :exit
+:not_zero           PRINTSTRXY #37;#9;DoubleOnStr
+:exit               rep   #$30
                     rts
 
 
@@ -1029,28 +1066,28 @@ DoHelp              mx    %00                   ; comes from MenuAction
                     sep   #$30
                     jsr   DrawOnlyNinjaBackground
                     jsr   DrawNinjaBubble
-                    PRINTSTRSXY #33;#10;HelpStr0
+                    PRINTSTRSXY #37;#11;HelpStr0
                     jsr   WaitKey
                     jsr   DrawNinjaBubble
-                    PRINTSTRSXY #36;#10;ThankStr0
+                    PRINTSTRSXY #40;#11;ThankStr0
                     jsr   Digawait              ; special wait
                     jsr   DrawNinjaBubble
-                    PRINTSTRSXY #33;#9;MoreTracksStrs
+                    PRINTSTRSXY #32;#11;MoreTracksStrs
                     jsr   WaitKey
 
 :cleanup            jsr   DrawMenuBackground
                     jmp   DrawNinjaInPlace
 
 Digawait            mx    %11
-:loop               PRINTSTRXY #49;#10;Dig1
+:loop               PRINTSTRXY #53;#11;Dig1
                     ldx   #$30                  ; DELAY
                     jsr   FadeDelay
                     bcs   :done
-                    PRINTSTRXY #49;#10;Dig2
+                    PRINTSTRXY #53;#11;Dig2
                     ldx   #$30                  ; DELAY
                     jsr   FadeDelay
                     bcs   :done
-                    PRINTSTRXY #49;#10;Dig3
+                    PRINTSTRXY #53;#11;Dig3
                     ldx   #$30                  ; DELAY
                     jsr   FadeDelay
                     bcs   :done
@@ -1070,6 +1107,9 @@ DrawMenuBackground  mx    %11
                     PRINTSTRXY #38;#9;ChooseTrackStr
                     PRINTSTRSXY #30;#10;TrackBoxStrs
                     PRINTSTRXY #68;#21;HelpStr
+                    ldx   #$1                   ; show status if ON
+                    jsr   DrawDoublerStatus
+                    sep #$30
                     rts
 
 DrawMenuBackgroundBox mx  %11
@@ -1101,10 +1141,10 @@ DrawSplash          mx    %11
 
                     ldx   #$80                  ; DELAY
                     jsr   FadeDelay
-                    bcc   WipeSplash
-                    rts                         ; they hit key - skip
+                    bcc   WipeSplash            ; clear? then keep animating
+                    rts                         ; otherwise, they hit key - skip
 
-                                                ; FALL THROUGH FOR NOW
+
 WipeSplash          mx    %11
                     PRINTSTRSXY #4;#7;LogoStrs
                     lda   #$F0
@@ -1158,7 +1198,7 @@ FadeDelay           mx    %11
                     rts
 
 DrawNinjaBubble     mx    %11
-                    PRINTSTRSXY #27;#8;NinjaBubble
+                    PRINTSTRSXY #27;#9;NinjaBubble
                     rts
 
 DrawNinjaInPlace    mx    %11
@@ -1273,18 +1313,24 @@ IcoDirString        asc   'XY'," ",$00
 IcoParentString     asc   'KI'," ",$00
 IcoVolString        asc   'Z^'," ",$00
 IcoNoString         asc   "   ",$00
-CantPlayFileString  asc   "Can't play this file!!",$00,$00,$00
-CantAllocMemString  asc   "Can't allocate memory!!",$00,$00,$00
+CantPlayFileString  asc   "Can't play this file!!",$00,
+CantAllocMemString  asc   "Can't allocate memory!!",$00
+NTPPrep_Errs        da    NTPPrep_ErrMsg1,NTPPrep_ErrMsg2,NTPPrep_ErrMsg3
+NTPPrep_ErrMsg1     asc   "NTPErr1: Not an NTP file",00
+                    asc   "         Couldn't find header",00,00
+NTPPrep_ErrMsg2     asc   "NTPErr2: File version not supported",00,00
+NTPPrep_ErrMsg3     asc   "NTPErr3: Disable channel doubling",'I',00
+                    asc   "         Max 7 channels for effect.",00,00
 
-LoadingFileString   asc   "Loading ",$00,$00,$00
 
 HelpStr0            asc   'J'," ",'K'," Use arrows to navigate.",00
-HelpStr1            asc   "  ",'M'," Press Return to play song",'I',00
-                    asc   "          or enter directory.",00
+                    asc   "  ",'M'," Press Return to play song",'I',00
+                    asc   "            or enter directory.",00
                     asc   " ",00
-HelpStr2            asc   " 'C' = Change 'C'olor ",00
-HelpStr3            asc   " 'B' = Change 'B'ackground",00
-                    asc   " ",00
+                    asc   " 'D' = Channel 'D'oubling",00
+                    asc   " 'C' = Change 'C'olor",00
+                    asc   " 'B' = Change 'B'ackground",00
+
 HelpStr4            asc   " 'Q' = 'Q'uit",00
                     hex   00,00
 
@@ -1293,22 +1339,23 @@ Dig2                asc   "D1G@R0K",00
 Dig3                asc   "D|GaR",'A',"K",00
 ThankStr0           asc   'U'," Written by DiGaRoK ",'H',00
                     asc   " ",00
-                    asc   "  ",'@A@',"  Thanks!!! ",'@A@',00
-                    asc   "  ",'[',"   Jesse Blue   ",'[',00
-                    asc   "  ",'[',"     FatDog     ",'[',00
-                    asc   "  ",'[',"    J.Craft     ",'[',00
-                    asc   "  ",'[',"    DWSJason    ",'[',00
-                    asc   "  ",'['," Antoine Vignau ",'[',00
+                    asc   " ",'@A@',"   Thanks!!!  ",'@A@',00
+                    asc   " ",'[',"    Jesse Blue    ",'[',00
+                    asc   " ",'[',"      FatDog      ",'[',00
+                    asc   " ",'[',"     J.Craft      ",'[',00
+                    asc   " ",'[',"     DWSJason     ",'[',00
+                    asc   " ",'[',"  Antoine Vignau  ",'[',00
+                    asc   " ",'[[[[[[[[[[[[[[[[[[[[',00
+
                     hex   00
-MoreTracksStrs      asc   "Want more songs?  ",00
-                    asc   "  Use the online converter at:",00
+MoreTracksStrs      asc   " Want more songs?  ",00
+                    asc   "       Use the online converter at:",00
                     asc   " ",00
-                    asc   "   >>",'UU'," ninjaforce.com ",'HH',"<<",00
+                    asc   "        >>",'UU'," ninjaforce.com ",'HH',"<<",00
                     asc   " ",00
-                    asc   "You can convert MODs that you",00
-                    asc   "find online, or you can write",00
-                    asc   "your own using programs like ",00
-                    asc   "OpenMPT.  Have Fun!",00
+                    asc   "You can convert MODs that you find online,",00
+                    asc   "or you can write your own using programs",00
+                    asc   "like OpenMPT.  Have Fun!",00
                     asc   "                           -D",00
                     hex   00
 
@@ -1322,7 +1369,7 @@ LogoStrs            asc   "                                                 ",00
 
 
 MenuBoxStrs         asc   " ______________________________________________________________________________",00
-                    asc   'ZV_@'," v1.0.2",'ZVWVWVWVWVWVWVWVWVWVWVWV_',"Ninjaforce",'ZVWVWVWVWVWVWVWVWV_',"][ infinitum",'ZW_',00
+                    asc   'ZV_@'," v1.0.3",'ZVWVWVWVWVWVWVWVWVWVWVWV_',"Ninjaforce",'ZVWVWVWVWVWVWVWVWV_',"][ infinitum",'ZW_',00
                     asc   'ZLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL_',00
                     hex   FF,14                 ; repeat 20x
                     asc   'Z',"                                                                              ",'_',00
@@ -1336,7 +1383,8 @@ SenseiLogoStrs      asc   "   _____                                _     ____   
                     asc   "                                                                 /____/  ",00
                     hex   00
 
-
+DoubleOnStr         asc   "Channel Doubling On ",'D',00
+DoubleOffStr        asc   "Channel Doubling Off ",00
 FileStr             asc   "File: ",00
 NowPlayingStrs      asc   " _______________________",00
 NowPlayingBStrs     asc   'Z',"                       ",'_',00
@@ -1362,15 +1410,17 @@ TrackBoxStrs        asc   " _________________________________",00
                     hex   00
 HelpStr             asc   "? - help",00
 
-NinjaBubble         asc   "    _________________________________",00
-                    hex   FF,06                 ; repeat 6x
-                    asc   "   ",'Z',"                                 ",'_',00
-                    asc   "   /                                 ",'_',00
-                    asc   "  /                                  ",'_',00
-                    asc   " /                                   ",'_',00
-                    asc   "/                                    ",'_',00
-                    asc   'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',00
+NinjaBubble         asc   "   ____________________________________________",00
+                    hex   FF,07                 ; repeat 7x
+                    asc   "  ",'Z',"                                            ",'_',00
+                    asc   "  /                                            ",'_',00
+                    asc   " /                                             ",'_',00
+                    asc   "/                                              ",'_',00
+                    asc   'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',00
                     hex   00
+
+NinjaAppleEyesClose asc   '@',"     ",'@',00
+NinjaAngryBrows     asc   "   _.:'|   ,-\---/--|   ",00
 NinjaStrs           asc   "                        ",00
                     asc   "           ______       ",00
                     asc   "         .'      `.     ",00
@@ -1386,8 +1436,6 @@ NinjaStrs           asc   "                        ",00
                     asc   " __.---``         `--._ ",00
                     asc   "/                      \",00
                     hex   00
-NinjaAppleEyesClose asc   '@',"     ",'@',00
-NinjaAngryBrows     asc   "   _.:'|   ,-\---/--|   ",00,00,00
 
 
 
