@@ -95,8 +95,8 @@ MenuHandlePrefixChange mx %11
 
 
 SelectorInit        mx    %00
-:setup              SL_SETWINDOWPOS 31;11
-                    SL_SETWINDOWSIZE 32;10
+:setup              SL_SETWINDOWPOS 32;11
+                    SL_SETWINDOWSIZE 32;11
                     SL_SETRENDERFUNCTION DirectoryRenderItem
                     lda   DirListCount
                     sta   SL_itemscount
@@ -1068,20 +1068,12 @@ DrawMenuBackground  mx    %11
                     jsr   DrawMenuBackgroundBox
                     PRINTSTRSXY #3;#3;SenseiLogoStrs
                     PRINTSTRXY #38;#9;ChooseTrackStr
-                    PRINTSTRSXY #29;#10;TrackBoxStrs
+                    PRINTSTRSXY #30;#10;TrackBoxStrs
                     PRINTSTRXY #68;#21;HelpStr
                     rts
 
 DrawMenuBackgroundBox mx  %11
-;                  jsr   text_clear            ; clear screen  <- don't need because we are wall-to-wall :P
-                    stz   text_h                ; set top left corner (HOME)
-                    stz   text_v
-                    lda   #MenuTopStrs
-                    ldy   #>MenuTopStrs
-                    ldx   #00                   ; horiz pos
-                    jsr   PrintStringsX         ; implied rts
-                    PRINTSTRXLUP #0;#3;#20;MenuMidStr
-                    PRINTSTRXY #0;#23;MenuBotStr
+                    PRINTSTRSXY #0;#0;MenuBoxStrs
                     rts
 
 DrawSplash          mx    %11
@@ -1205,6 +1197,31 @@ _dnai_y             db    0                     ; y start
 _dnai_y_clip        db    0                     ; current value
 _dnai_y_clip_max    db    0                     ; done value
 
+                    mx    %11
+; x = x, y=y, clip = ylines to draw before stopping
+DrawNinjaXYClip     jsr   SetYClip              ; with A value
+                    sty   text_v                ; works
+                    lda   #NinjaStrs
+                    ldy   #>NinjaStrs
+                    jmp   PrintStringsXYClip    ; implied rts
+
+
+; x = x, y=y, clip = ylines to draw before stopping
+DrawLogoXYClip      jsr   SetYClip              ; with A value
+                    sty   text_v                ; works
+                    lda   #LogoStrs
+                    ldy   #>LogoStrs
+                    jmp   PrintStringsXYClip    ; implied rts
+
+
+WaitKeyColor        mx    %11
+                    inc   $c034
+WaitKey             mx    %11
+:nope               lda   KEY
+                    bpl   :nope
+                    sta   STROBE
+                    rts
+
 
 SaveTextColors      mx    %11
                     lda   $c034
@@ -1213,12 +1230,14 @@ SaveTextColors      mx    %11
                     sta   _bak_textcolor
                     rts
 
+
 TextColorInit       mx    %11
                     lda   #0
                     sta   _cur_bordercolor
                     lda   #$C0                  ; grn black
                     sta   _cur_textcolor
                     rts
+
 
 TextColorSet        mx    %11
                     lda   _cur_bordercolor
@@ -1241,13 +1260,14 @@ _cur_bordercolor    ds    1
 _cur_textcolor      ds    1
 
 
-
-
 PrefixSlashStr      str   '/'
-
 DirListCount        dw    0
 
-MouseString         asc   '@ABCDEFGHIJKLMNOPQRSTUVWXYZXYXY[\]^_',00
+KEY                 equ   $C000
+STROBE              equ   $C010
+
+
+* MouseString         asc   '@ABCDEFGHIJKLMNOPQRSTUVWXYZXYXY[\]^_',00
 PatPosString        asc   '_',"Pat:    ",'C'," Pos:   ",'Z',00
 IcoDirString        asc   'XY'," ",$00
 IcoParentString     asc   'KI'," ",$00
@@ -1301,12 +1321,13 @@ LogoStrs            asc   "                                                 ",00
                     asc   "                    /___/",00,00
 
 
-MenuTopStrs         asc   " ______________________________________________________________________________",00
-                    asc   'ZV_@'," v1.0.1",'ZVWVWVWVWVWVWVWVWVWVWVWV_',"Ninjaforce",'ZVWVWVWVWVWVWVWVWV_',"][ infinitum",'ZW_',00
+MenuBoxStrs         asc   " ______________________________________________________________________________",00
+                    asc   'ZV_@'," v1.0.2",'ZVWVWVWVWVWVWVWVWVWVWVWV_',"Ninjaforce",'ZVWVWVWVWVWVWVWVWV_',"][ infinitum",'ZW_',00
                     asc   'ZLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL_',00
-                    hex   00
-MenuMidStr          asc   'Z',"                                                                              ",'_',00
-MenuBotStr          asc   " ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'," ",00
+                    hex   FF,14                 ; repeat 20x
+                    asc   'Z',"                                                                              ",'_',00
+                    asc   " ",'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL'," ",00,00
+
 SenseiLogoStrs      asc   "   _____                                _     ____     __ ",00
                     asc   "  / ___/  ___    ____    _____  ___    (_)   / __ \   / /  ____ _   __  __ ",00
                     asc   "  \__ \  / _ \  / __ \  / ___/ / _ \  / /   / /_/ /  / /  / __ `/  / / / / ",00
@@ -1325,9 +1346,7 @@ TitleStr            asc   "title:",00
 FileInfoStrs        asc   " ______________________________________________",00
                     asc   'Z^GGGGGGGGGGGGG_',"                 ",'ZGGGGGGGGGGGGG_',00
                     asc   'ZLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL_',00
-                    asc   'Z',"                                              ",'_',00
-                    asc   'Z',"                                              ",'_',00
-                    asc   'Z',"                                              ",'_',00
+                    hex   FF,04
                     asc   'Z',"                                              ",'_',00
                     hex   00
 
@@ -1337,26 +1356,14 @@ FileInfoDetStrs     asc   "Tracks:                 Instruments:",00
 
 ChooseTrackStr      asc   "Choose a track:",00
 TrackBoxStrs        asc   " _________________________________",00
-                    asc   'Z',"                                 ",'_',00
-                    asc   'Z',"                                 ",'_',00
-                    asc   'Z',"                                 ",'_',00
-                    asc   'Z',"                                 ",'_',00
-                    asc   'Z',"                                 ",'_',00
-                    asc   'Z',"                                 ",'_',00
-                    asc   'Z',"                                 ",'_',00
-                    asc   'Z',"                                 ",'_',00
-                    asc   'Z',"                                 ",'_',00
+                    hex   FF,0B                 ; repeat 10x
                     asc   'Z',"                                 ",'_',00
                     asc   " ",,'LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL',00
                     hex   00
 HelpStr             asc   "? - help",00
 
 NinjaBubble         asc   "    _________________________________",00
-                    asc   "   ",'Z',"                                 ",'_',00
-                    asc   "   ",'Z',"                                 ",'_',00
-                    asc   "   ",'Z',"                                 ",'_',00
-                    asc   "   ",'Z',"                                 ",'_',00
-                    asc   "   ",'Z',"                                 ",'_',00
+                    hex   FF,06                 ; repeat 6x
                     asc   "   ",'Z',"                                 ",'_',00
                     asc   "   /                                 ",'_',00
                     asc   "  /                                  ",'_',00
@@ -1381,35 +1388,6 @@ NinjaStrs           asc   "                        ",00
                     hex   00
 NinjaAppleEyesClose asc   '@',"     ",'@',00
 NinjaAngryBrows     asc   "   _.:'|   ,-\---/--|   ",00,00,00
-
-                    mx    %11
-; x = x, y=y, clip = ylines to draw before stopping
-DrawNinjaXYClip     jsr   SetYClip              ; with A value
-                    sty   text_v                ; works
-                    lda   #NinjaStrs
-                    ldy   #>NinjaStrs
-                    jmp   PrintStringsXYClip    ; implied rts
-
-
-; x = x, y=y, clip = ylines to draw before stopping
-DrawLogoXYClip      jsr   SetYClip              ; with A value
-                    sty   text_v                ; works
-                    lda   #LogoStrs
-                    ldy   #>LogoStrs
-                    jmp   PrintStringsXYClip    ; implied rts
-
-
-
-WaitKeyColor        mx    %11
-                    inc   $c034
-WaitKey             mx    %11
-:nope               lda   KEY
-                    bpl   :nope
-                    sta   STROBE
-                    rts
-KEY                 equ   $C000
-STROBE              equ   $C010
-
 
 
 

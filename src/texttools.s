@@ -299,10 +299,6 @@ CHAR10              DS    10
 
 
 
-
-
-
-
 GOXY                MAC
                     ldx   ]1
                     ldy   ]2
@@ -382,6 +378,7 @@ BigNum              MAC
 * lda #MainMenuStrs
 * ldy #>MainMenuStrs
 * ldx #05 ; horiz pos
+** Also supports looping with format   $FF,${count},ascii string
 PrintStringsX       mx    %11
                     stx   _printstringsx_horiz
 
@@ -393,10 +390,21 @@ PrintStringsX       mx    %11
                     ldy   $1
                     jsr   PrintString           ; y is last val
                     inc   text_v                ; update cursor pos
-                    iny
+                    ldx   _printstrings_lupcnt  ; are we in a string loop?
+                    beq   :not_looping
+                    dec   _printstrings_lupcnt
+                    bra   :loop
+:not_looping        iny
                     lda   ($0),y
                     beq   :done
-                    tya                         ; not done so add strlen to source ptr
+:check_looper       cmp   #$FF                  ; loop byte?
+                    bne   :advance_line
+:set_looper         iny
+                    lda   ($0),y
+                    dec                         ; need to pre-decrement 🍺
+                    sta   _printstrings_lupcnt
+                    iny                         ; advance to start of loop string
+:advance_line       tya                         ; not done so add strlen to source ptr
                     clc
                     adc   $0
                     sta   $0
@@ -405,7 +413,7 @@ PrintStringsX       mx    %11
 :nocarry            bra   :loop
 
 :done               rts
-
+_printstrings_lupcnt db   00
 _printstringsx_horiz db   00
 _printstringsy_clip db    00
 * lda #MainMenuStrs
