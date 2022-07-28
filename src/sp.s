@@ -489,8 +489,6 @@ PlayerUi            mx    %00
                     clc
                     xce
                     rep   #$30
-
-
                     jsr   SL_GetSelected        ; print name
                     tax
                     jsr   SetPtr0toDirEntry
@@ -507,6 +505,9 @@ PlayerUi            mx    %00
                     lda   VUBarY+8
                     sta   text_v
                     rep   $30
+                    jsr   SL_GetSelected        ; set ptr again just in case (bug reported?)
+                    tax
+                    jsr   SetPtr0toDirEntry     
 
                     lda   $0
                     >>>   PT_PrintProdosStr
