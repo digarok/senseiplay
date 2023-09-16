@@ -1,4 +1,4 @@
-name: HDGR CI (Appy Project - 65xxx Assemble+Package)
+name: SenseiPlay CI (Appy Project - 65xxx Assemble+Package)
 
 on:
   pull_request:
@@ -18,6 +18,11 @@ jobs:
         with:
           include_prodos: true
           # appy_version: v0.1.7
+       # This project also needs the ntp sources
+      - name: Get NTP Sources
+        run: |
+          curl -O -J -L http://www.ninjaforce.com/downloads/ntpsources.zip
+          unzip ntpsources.zip
       # Now you can use it to assemble your project(s)
       - name: Assemble
         run: |
