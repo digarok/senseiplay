@@ -1,5 +1,0 @@
-[submodule "ninjatrackerplus"]
-	path = ninjatrackerplus
-	url = ../ninjatrackerplus.git
-	branch = master
-	update = rebase
