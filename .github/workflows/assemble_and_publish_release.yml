@@ -21,6 +21,7 @@ jobs:
        # This project also needs the ntp sources
       - name: Get NTP Sources
         run: |
+          cd ninjatrackerplus
           curl -O -J -L http://www.ninjaforce.com/downloads/ntpsources.zip
           unzip ntpsources.zip
       # Now you can use it to assemble your project(s)
