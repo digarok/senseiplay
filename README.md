@@ -68,7 +68,7 @@ unzip ntpsources.zip
 merlin32 . ninjatrackerplus.s
 ```
 ### SenseiPlay assembly
-You can build it using my project tool which will also generate a disk image, (Appy)[https://github.com/digarok/appy], or just run merlin32 on the source yourself. 
+You can build it using my project tool which will also generate a disk image, [Appy](https://github.com/digarok/appy), or just run [merlin32](https://brutaldeluxe.fr/products/crossdevtools/merlin/) on the source yourself. 
 ```
 merlin32 -V . src/sp.s
 ``` 
