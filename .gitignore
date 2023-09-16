@@ -1,7 +1,11 @@
 # used for local user files that should never get checked in
 local/
+env3/
 # Merlin
 *_Output.txt  
 *.system
 # appy
 appy.user.yaml
+.DS_Store
+*.mod
+*.ntp

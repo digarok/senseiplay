@@ -6,28 +6,29 @@ disks:
   files:
   - input: ../PRODOS.2.4.2/PRODOS
     output: /senseiplay        
-  - input: src/sp.s
-    output: /senseiplay/src
   - input: ninjatrackerplus/ntpplayer
     output: /senseiplay
-  #- input: ../modsearch/potential/eclipse.ntp
-  #  output: /senseiplay
-  #  ftaux: #B30000
+  - input: assets/dgr.radio.dgr
+    output: /senseiplay
   - input: src/sensei.system
     output: /senseiplay
-  - input: content/NHFbyNFCv03.ntp
-    output: /senseiplay/ntp
-  - input: content/dotland.ntp
-    output: /senseiplay/ntp
-  - input: content/eshaa.ntp
-    output: /senseiplay
-  - input: content/exquisite.ntp
-    output: /senseiplay/ntp
-  - input: content/dr4.ntp
-    output: /senseiplay/ntp
-  - input: content/eff.ntp
-    output: /senseiplay/ntp
-  - input: content/einstein.ntp
-    output: /senseiplay/ntp
-  - input: content/engine.ntp
-    output: /senseiplay/ntp
+  
+  - input: assets/mods-amiga-example/everyway.ntp
+    output: /senseiplay/songs
+  - input: assets/mods-amiga-example/naffjungl.ntp
+    output: /senseiplay/songs
+  - input: assets/mods-amiga-example/jammdawn.ntp
+    output: /senseiplay/songs
+  - input: assets/mods-amiga-example/nofrost.ntp
+    output: /senseiplay/songs
+  - input: assets/mods-amiga-example/glamour4u.ntp
+    output: /senseiplay/songs
+  - input: assets/mods-gs-digarok/clacknroll.ntp
+    output: /senseiplay/songs
+  - input: assets/mods-amiga-example/naffjungl4.ntp
+    output: /senseiplay/songs
+  - input: assets/mods-amiga-example/neut.orange.ntp
+    output: /senseiplay/songs
+  - input: assets/mods-amiga-example/hot.dots.ntp
+    output: /senseiplay/songs
+    
